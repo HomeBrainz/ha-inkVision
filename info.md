@@ -4,21 +4,20 @@
   <img src="icon.svg" alt="HomeBrainz Logo" width="150">
 </p>
 
-Connect your HomeBrainz Clock device to Home Assistant for comprehensive environmental monitoring.
+Connect your HomeBrainz device to Home Assistant for local monitoring and control.
 
 ### Features
 
-- **7 Sensor Types**: Temperature, Humidity, Pressure, Air Quality Index, CO2, TVOC, and WiFi Signal
-- **Easy Setup**: Simple configuration through Home Assistant UI
-- **Real-time Monitoring**: 30-second update intervals
-- **Device Management**: Direct access to device web interface
+- **WebSocket-first updates** with HTTP fallback polling
+- **Easy setup** through Home Assistant UI (auto-discovery + manual host fallback)
+- **Multi-platform support**: sensors, controls, firmware actions, and media player
+- **Device management** with direct link to the device web interface
 
 ### Supported Sensors
 
-- **AHT20**: Temperature and Humidity
-- **BMP280**: Atmospheric Pressure  
-- **ENS160**: Air Quality Index, CO2, and TVOC
-- **WiFi**: Signal Strength Monitoring
+- **BME680 (+ BSEC2)**: IAQ, CO2 equivalent, breath VOC, gas resistance, temperature, humidity, pressure
+- **Legacy fallback**: AHT20 and BMP280 endpoints
+- **WiFi**: Signal strength monitoring
 
 ### Quick Setup
 

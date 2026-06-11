@@ -105,12 +105,23 @@ def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
         payload.get("type"),
         title,
     )
+    supported_markers = (
+        "homebrainz",
+        "inkvision",
+        "atmos",
+        "bento",
+        "hbz",
+    )
     looks_like_homebrainz = any(
-        isinstance(marker, str) and "homebrainz" in marker.lower()
+        isinstance(marker, str)
+        and any(candidate in marker.lower() for candidate in supported_markers)
         for marker in markers
     )
 
     if payload.get("type") == "HOMEBRAINZ_DEVICE":
+        looks_like_homebrainz = True
+
+    if payload.get("model") in {"ATMOS-SMART-CLOCK-001", "ATMOS_BOX_001", "BENTO-BAR-001"}:
         looks_like_homebrainz = True
 
     if not looks_like_homebrainz:

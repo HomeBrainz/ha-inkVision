@@ -17,14 +17,22 @@ HomeBrainz develops the inkVision(R) product line. Learn more at [homebrainz.eu]
 
 Platform | Description
 -- | --
-`sensor` | Temperature, Humidity, Pressure, Air Quality Index, CO2, TVOC, and WiFi Signal sensors
+`sensor` | Environmental, air-quality, device diagnostics, firmware metadata, and WiFi signal sensors
+`number` | Display brightness control (0-15)
+`select` | Device timezone selector
+`switch` | Screen rotation toggles (clock, temp, humidity, pressure, gas, iaq)
+`binary_sensor` | Firmware update availability state
+`button` | Firmware check and firmware install actions
+`media_player` | Speaker playback, volume, and mute controls
 
 ## Features
 
-- **Multiple Sensor Support**: Monitors temperature, humidity, atmospheric pressure, air quality (AQI), CO2 levels, TVOC (Total Volatile Organic Compounds), and WiFi signal strength
+- **Real-time Updates First**: Uses WebSocket (`/ws`) for primary live updates with automatic retry, then falls back to periodic HTTP polling
+- **Fallback Polling**: Polls every 5 minutes when WebSocket is unavailable
+- **Multiple Sensor Support**: Monitors temperature, humidity, pressure, gas resistance, IAQ metrics, CO2 equivalent, breath VOC, and WiFi signal strength
 - **Easy Setup**: Home Assistant configuration flow with mDNS discovery and manual host entry fallback
-- **Real-time Updates**: Polls device every 30 seconds for current sensor readings
-- **Device Information**: Shows device details including firmware version and MAC address
+- **Device Information**: Exposes device details including firmware metadata, MAC, IP, uptime, and brightness diagnostics
+- **Device Controls**: Supports brightness, timezone, screen rotation, firmware actions, and speaker control
 - **Web Interface**: Direct link to device configuration page
 
 ## Supported Devices
@@ -34,9 +42,8 @@ Platform | Description
 - inkVision(R) Clock (legacy HomeBrainz clock firmware)
 
 Supported sensor packages include:
-  - AHT20 Temperature & Humidity Sensor
-  - BMP280 Barometric Pressure Sensor  
-  - ENS160 Air Quality Sensor (AQI, CO2, TVOC)
+  - BME680 (+ BSEC2) for IAQ, CO2 equivalent, breath VOC, gas resistance, temperature, humidity, and pressure
+  - Legacy fallback support for AHT20 and BMP280 endpoints
   - WiFi Signal Strength Monitoring
 
 ## Installation
@@ -83,15 +90,45 @@ You can find your device's IP address by:
 
 ## Entities
 
-Once configured, the integration will create the following entities:
+Once configured, the integration creates sensors and controls across multiple platforms. Core entities include:
 
-- `sensor.temperature` - Temperature reading from AHT20 sensor (°C)
-- `sensor.humidity` - Humidity reading from AHT20 sensor (%)
-- `sensor.pressure` - Atmospheric pressure from BMP280 sensor (hPa)
-- `sensor.air_quality_index` - Air quality index from ENS160 sensor (1-5 scale)
-- `sensor.co2` - CO2 concentration from ENS160 sensor (ppm)
-- `sensor.tvoc` - Total Volatile Organic Compounds from ENS160 sensor (ppb)
-- `sensor.wifi_signal` - WiFi signal strength (dBm)
+- `sensor.temperature`
+- `sensor.humidity`
+- `sensor.pressure`
+- `sensor.wifi_signal`
+- `sensor.gas_resistance`
+- `sensor.indoor_air_quality`
+- `sensor.static_iaq`
+- `sensor.co2_equivalent`
+- `sensor.breath_voc`
+- `sensor.iaq_rating`
+- `sensor.device_uptime` (diagnostic)
+- `sensor.display_brightness` (diagnostic)
+- `sensor.ip_address` (diagnostic)
+- `sensor.mac_address` (diagnostic)
+- `sensor.firmware_version` (diagnostic)
+- `sensor.firmware_id` (diagnostic)
+- `sensor.latest_firmware_id` (diagnostic)
+- `sensor.latest_firmware_version` (diagnostic)
+- `number.display_brightness`
+- `select.timezone`
+- `switch.screen_clock`, `switch.screen_temp`, `switch.screen_humidity`, `switch.screen_pressure`, `switch.screen_gas`, `switch.screen_iaq`
+- `binary_sensor.firmware_update_available`
+- `button.check_firmware_update`
+- `button.install_firmware_update`
+- `media_player.speaker`
+
+Entity IDs can vary by Home Assistant naming rules and your device name.
+
+## Services
+
+The integration registers these Home Assistant services:
+
+- `homebrainz.set_brightness`
+- `homebrainz.display_text`
+- `homebrainz.restart_device`
+- `homebrainz.set_screen_rotation`
+- `homebrainz.set_timezone`
 
 ## Device Configuration
 
