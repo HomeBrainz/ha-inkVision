@@ -22,14 +22,6 @@
     },
     {
       "type": "_http._tcp.local.",
-      "name": "HomeBrainz*"
-    },
-    {
-      "type": "_http._tcp.local.",
-      "name": "HBZ*"
-    },
-    {
-      "type": "_http._tcp.local.",
       "name": "hbz*"
     }
   ]
