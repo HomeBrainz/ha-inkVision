@@ -54,7 +54,7 @@ Supported sensor packages include:
 2. Click on "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/11ado33/ha-homebrainz-integration`
+5. Add this repository URL: `https://github.com/HomeBrainz/ha-inkVision`
 6. Select "Integration" as the category
 7. Click "Add"
 8. Find "HomeBrainz" in the integrations list and click "Download"
@@ -169,14 +169,14 @@ If the integration stops updating:
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
 
 [integration_blueprint]: https://github.com/ludeeus/integration_blueprint
-[commits-shield]: https://img.shields.io/github/commit-activity/y/11ado33/ha-homebrainz-integration.svg?style=for-the-badge
-[commits]: https://github.com/11ado33/ha-homebrainz-integration/commits/main
+[commits-shield]: https://img.shields.io/github/commit-activity/y/HomeBrainz/ha-inkVision.svg?style=for-the-badge
+[commits]: https://github.com/HomeBrainz/ha-inkVision/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[license-shield]: https://img.shields.io/github/license/11ado33/ha-homebrainz-integration.svg?style=for-the-badge
+[license-shield]: https://img.shields.io/github/license/HomeBrainz/ha-inkVision.svg?style=for-the-badge
 [maintenance-shield]: https://img.shields.io/badge/maintainer-%4011ado33-blue.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/11ado33/ha-homebrainz-integration.svg?style=for-the-badge
-[releases]: https://github.com/11ado33/ha-homebrainz-integration/releases
+[releases-shield]: https://img.shields.io/github/release/HomeBrainz/ha-inkVision.svg?style=for-the-badge
+[releases]: https://github.com/HomeBrainz/ha-inkVision/releases
 [homebrainz-site]: https://homebrainz.eu
 [inkvision-site]: https://inkvision.eu
 [user_profile]: https://github.com/11ado33

@@ -4,14 +4,14 @@
   "codeowners": ["@11ado33"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/11ado33/ha-homebrainz-integration",
+  "documentation": "https://github.com/HomeBrainz/ha-inkVision",
   "homekit": {},
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/11ado33/ha-homebrainz-integration/issues",
+  "issue_tracker": "https://github.com/HomeBrainz/ha-inkVision/issues",
   "loggers": ["custom_components.homebrainz"],
   "requirements": ["aiohttp>=3.8.0", "websockets>=11.0"],
   "ssdp": [],
-  "version": "0.0.10",
+  "version": "1.0.11",
   "zeroconf": [
     {
       "type": "_homebrainz._tcp.local."

@@ -78,7 +78,7 @@ This PR adds branding for the HomeBrainz custom integration:
 
 - **Integration**: HomeBrainz Clock environmental monitoring
 - **Domain**: homebrainz  
-- **Repository**: https://github.com/11ado33/ha-homebrainz-integration
+- **Repository**: https://github.com/HomeBrainz/ha-inkVision
 - **Logo**: Clean brain and house icon design
 - **Files**: icon.png (512x512), icon@2x.png (1024x1024), logo.png (512x512)
 
