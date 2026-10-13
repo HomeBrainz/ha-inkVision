@@ -252,10 +252,13 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
             screens_snapshot = deepcopy(existing.get("screens", []))
             ota_snapshot = deepcopy(existing.get("ota", {}))
             config_snapshot = deepcopy(existing.get("config", {}))
+            # Merge: pushes carry a subset of /status (e.g. no firmware_id on some builds).
+            status_snapshot = deepcopy(existing.get("status", {}))
+            status_snapshot.update(status_payload)
 
             self.async_set_updated_data({
                 "sensors": sensors_snapshot,
-                "status": status_payload,
+                "status": status_snapshot,
                 "screens": screens_snapshot,
                 "ota": ota_snapshot,
                 "config": config_snapshot,
@@ -302,10 +305,13 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
                 screens_snapshot = deepcopy(existing.get("screens", []))
                 ota_snapshot = deepcopy(existing.get("ota", {}))
                 config_snapshot = deepcopy(existing.get("config", {}))
+                # Merge: the WebSocket get_status reply omits fields that /status has.
+                status_snapshot = deepcopy(existing.get("status", {}))
+                status_snapshot.update(status_data)
 
                 self.async_set_updated_data({
                     "sensors": sensors_snapshot,
-                    "status": status_data,
+                    "status": status_snapshot,
                     "screens": screens_snapshot,
                     "ota": ota_snapshot,
                     "config": config_snapshot,
