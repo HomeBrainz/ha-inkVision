@@ -37,7 +37,7 @@ PLATFORMS: list[Platform] = [
 
 UPDATE_INTERVAL = timedelta(seconds=300)  # 5 minute fallback polling (WebSocket is primary)
 WEBSOCKET_RETRY_DELAY = 10  # seconds
-WEBSOCKET_MAX_RETRIES = 5
+WEBSOCKET_MAX_RETRY_DELAY = 30  # seconds
 
 # Service schemas
 SERVICE_SET_BRIGHTNESS = "set_brightness"
@@ -113,19 +113,21 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
         """Handle WebSocket connection and messages."""
         while True:
             try:
-                _LOGGER.info("Attempting to connect to WebSocket at %s", self._websocket_url)
+                _LOGGER.debug("Attempting to connect to WebSocket at %s", self._websocket_url)
                 
                 async with websockets.connect(
                     self._websocket_url,
-                    ping_interval=30,
+                    ping_interval=15,
                     ping_timeout=10,
-                    close_timeout=10
+                    close_timeout=5
                 ) as websocket:
                     self._websocket = websocket
                     self._websocket_connected = True
+                    if self._retry_count:
+                        _LOGGER.info("WebSocket reconnected to HomeBrainz device at %s", self.host)
+                    else:
+                        _LOGGER.debug("WebSocket connected to HomeBrainz device at %s", self.host)
                     self._retry_count = 0
-                    
-                    _LOGGER.info("WebSocket connected to HomeBrainz device")
                     
                     # Request initial data
                     await self._send_websocket_command({"command": "get_status"})
@@ -142,29 +144,32 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
                             _LOGGER.error("Error processing WebSocket message: %s", err)
                             
             except (WebSocketException, ConnectionClosedError, OSError) as err:
+                was_connected = self._websocket_connected
                 self._websocket_connected = False
                 self._websocket = None
                 self._retry_count += 1
-                
-                if self._retry_count <= WEBSOCKET_MAX_RETRIES:
-                    delay = min(WEBSOCKET_RETRY_DELAY * self._retry_count, 60)
-                    _LOGGER.warning(
-                        "WebSocket connection lost (%s), retrying in %d seconds (attempt %d/%d)",
-                        err, delay, self._retry_count, WEBSOCKET_MAX_RETRIES
-                    )
-                else:
-                    delay = 60
-                    _LOGGER.error(
-                        "WebSocket still failing after %d attempts, retrying every %d seconds",
-                        self._retry_count, delay
-                    )
+
+                if was_connected:
+                    # Poll over HTTP right away so entities go unavailable now
+                    # if the device is gone, rather than at the next 5 minute poll.
+                    await self.async_request_refresh()
+
+                delay = min(WEBSOCKET_RETRY_DELAY * self._retry_count, WEBSOCKET_MAX_RETRY_DELAY)
+                # Log once per outage; repeated attempts while the device is off stay at debug.
+                log = _LOGGER.warning if self._retry_count == 1 else _LOGGER.debug
+                log(
+                    "WebSocket connection to %s lost (%s), retrying every %d-%d seconds",
+                    self.host, err, WEBSOCKET_RETRY_DELAY, WEBSOCKET_MAX_RETRY_DELAY,
+                )
                 await asyncio.sleep(delay)
                     
             except asyncio.CancelledError:
                 _LOGGER.debug("WebSocket handler cancelled")
                 break
-            except Exception as err:
-                _LOGGER.error("Unexpected error in WebSocket handler: %s", err)
+            except Exception:
+                _LOGGER.exception("Unexpected error in WebSocket handler")
+                self._websocket_connected = False
+                self._websocket = None
                 await asyncio.sleep(WEBSOCKET_RETRY_DELAY)
 
     async def _send_websocket_command(self, command: dict):
