@@ -23,6 +23,14 @@
     {
       "type": "_http._tcp.local.",
       "name": "hbz*"
+    },
+    {
+      "type": "_http._tcp.local.",
+      "name": "inkvision*"
+    },
+    {
+      "type": "_http._tcp.local.",
+      "name": "atmos*"
     }
   ]
 }

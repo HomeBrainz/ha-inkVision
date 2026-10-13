@@ -70,7 +70,7 @@ def _is_homebrainz_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
         return True
 
     return any(
-        candidate.startswith(("homebrainz", "hbz"))
+        candidate.startswith(("homebrainz", "hbz", "inkvision", "atmos"))
         for candidate in (discovery_name, hostname, server)
         if candidate
     )
@@ -203,7 +203,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         unique_id = info["mac_address"] if info["mac_address"] else info["host"]
         await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured()
+        # Rediscovery of a configured device: refresh its host (DHCP may have
+        # moved it) and let HA reload an entry stuck in setup retry right away
+        # instead of waiting out the retry backoff (up to 10 minutes).
+        self._abort_if_unique_id_configured(updates={CONF_HOST: info["host"]})
 
         return self.async_create_entry(
             title=info["title"],
