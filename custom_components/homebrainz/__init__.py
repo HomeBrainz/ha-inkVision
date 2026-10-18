@@ -15,6 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback, ServiceCall
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers import device_registry as dr
@@ -83,6 +84,8 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
         self._retry_count = 0
         self._websocket_task = None
         self._websocket_connected = False
+        # monotonic time of the last successful HTTP poll; see async_poll_if_stale
+        self._last_poll: float | None = None
         
         super().__init__(
             hass,
@@ -90,6 +93,19 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=UPDATE_INTERVAL,  # Fallback polling
         )
+
+    async def async_poll_if_stale(self, _now=None) -> None:
+        """Run the HTTP poll if it has not succeeded within UPDATE_INTERVAL.
+
+        Every WebSocket push goes through async_set_updated_data(), which resets
+        the coordinator's own refresh timer. With a live WebSocket the scheduled
+        poll therefore never fires, and the status and OTA data it alone fetches
+        (firmware availability, version, uptime) would stay frozen at startup.
+        """
+        loop_time = self.hass.loop.time()
+        if self._last_poll is not None and loop_time - self._last_poll < UPDATE_INTERVAL.total_seconds():
+            return
+        await self.async_refresh()
 
     async def async_start_websocket(self):
         """Start the WebSocket connection."""
@@ -512,6 +528,7 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
                 if not config_data:
                     config_data = existing.get("config", {}) if isinstance(existing, dict) else {}
 
+                self._last_poll = self.hass.loop.time()
                 return {
                     "sensors": sensor_data if isinstance(sensor_data, dict) else {},
                     "status": status_data if isinstance(status_data, dict) else {},
@@ -536,6 +553,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Start WebSocket connection
     await coordinator.async_start_websocket()
+
+    # Independent of the coordinator's own timer, which WebSocket pushes keep
+    # resetting; check once a minute and poll when the last poll is stale.
+    entry.async_on_unload(
+        async_track_time_interval(hass, coordinator.async_poll_if_stale, timedelta(minutes=1))
+    )
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator

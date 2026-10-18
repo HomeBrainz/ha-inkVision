@@ -8,6 +8,7 @@ import aiohttp
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -101,16 +102,22 @@ class HomeBrainzFirmwareUpdateButton(HomeBrainzButtonEntity):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
-        """Handle the button press."""
+        """Re-check for an update, then install it."""
+        # The cached OTA data can be hours old; always act on a fresh check.
+        await self.coordinator.async_update_ota_status()
         ota = (self.coordinator.data or {}).get("ota", {})
-        if not isinstance(ota, dict):
-            _LOGGER.warning("No OTA data available; run check first")
-            return
+        if not isinstance(ota, dict) or not ota:
+            raise HomeAssistantError("Could not check for a firmware update; is the device online?")
+        if ota.get("error"):
+            raise HomeAssistantError(f"Firmware update check failed: {ota['error']}")
+        if not ota.get("updateAvailable"):
+            raise HomeAssistantError(
+                f"Firmware is already up to date ({ota.get('currentVersion', 'unknown')})"
+            )
 
         download_url = ota.get("downloadUrl")
         if not download_url:
-            _LOGGER.warning("No download URL available for firmware update")
-            return
+            raise HomeAssistantError("The update server did not provide a download URL")
 
         try:
             async with asyncio.timeout(15):
@@ -119,11 +126,15 @@ class HomeBrainzFirmwareUpdateButton(HomeBrainzButtonEntity):
                     json={"url": download_url, "confirm": True},
                 ) as response:
                     if response.status != 200:
-                        _LOGGER.error("Firmware update failed: %s", response.status)
-                        return
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            _LOGGER.error("Firmware update request failed", exc_info=True)
-            return
+                        body = await response.text()
+                        raise HomeAssistantError(
+                            f"Device rejected the firmware update ({response.status}): {body[:200]}"
+                        )
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise HomeAssistantError(f"Could not reach the device to start the update: {err}") from err
 
-        await asyncio.sleep(1)
-        await self.coordinator.async_update_ota_status()
+        _LOGGER.info(
+            "Firmware update to %s started on %s; the device reboots when done",
+            ota.get("latestVersion"),
+            self._host,
+        )
