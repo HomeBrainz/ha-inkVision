@@ -5,178 +5,114 @@
 </p>
 
 [![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
-
 [![hacs][hacsbadge]][hacs]
-[![Project Maintenance][maintenance-shield]][user_profile]
 
-**This integration will set up the following platforms.**
+Connect your inkVision(R) devices to Home Assistant for local monitoring and control. No cloud account is needed: the integration talks to the device directly on your network and receives updates in real time.
 
 HomeBrainz develops the inkVision(R) product line. Learn more at [homebrainz.eu][homebrainz-site] and [inkvision.eu][inkvision-site].
 
-Platform | Description
--- | --
-`sensor` | Environmental, air-quality, device diagnostics, firmware metadata, and WiFi signal sensors
-`number` | Display brightness control (0-15)
-`select` | Device timezone selector
-`switch` | Screen rotation toggles (clock, temp, humidity, pressure, gas, iaq)
-`binary_sensor` | Firmware update availability state
-`button` | Firmware check and firmware install actions
-`media_player` | Speaker playback, volume, and mute controls
+## Supported Devices
+
+Works with inkVision(R) devices running HomeBrainz firmware. Available entities depend on the device model and its sensors.
 
 ## Features
 
-- **Real-time Updates First**: Uses WebSocket (`/ws`) for primary live updates with automatic retry, then falls back to periodic HTTP polling
-- **Fallback Polling**: Polls every 5 minutes when WebSocket is unavailable
-- **Multiple Sensor Support**: Monitors temperature, humidity, pressure, gas resistance, IAQ metrics, CO2 equivalent, breath VOC, and WiFi signal strength
-- **Easy Setup**: Home Assistant configuration flow with mDNS discovery and manual host entry fallback
-- **Device Information**: Exposes device details including firmware metadata, MAC, IP, uptime, and brightness diagnostics
-- **Device Controls**: Supports brightness, timezone, screen rotation, firmware actions, and speaker control
-- **Web Interface**: Direct link to device configuration page
-
-## Supported Devices
-
-- inkVision(R) Atmos Smart Clock (HomeBrainz firmware)
-- inkVision(R) Bento Bar (HomeBrainz firmware, with compatible sensor package)
-- inkVision(R) Clock (legacy HomeBrainz clock firmware)
-
-Supported sensor packages include:
-  - BME680 (+ BSEC2) for IAQ, CO2 equivalent, breath VOC, gas resistance, temperature, humidity, and pressure
-  - Legacy fallback support for AHT20 and BMP280 endpoints
-  - WiFi Signal Strength Monitoring
+- **Local and real-time**: live updates over your local network, with automatic reconnection
+- **Easy setup**: devices are discovered automatically; you can also add one by IP address
+- **Environment sensors**: temperature, humidity, pressure, and air quality (IAQ, CO2 equivalent, VOC) on supported models
+- **Display controls**: brightness, timezone, and which screens the display rotates through
+- **Speaker** (models with a speaker): use the device as a media player for text-to-speech, internet radio, and your Home Assistant media library
+- **Firmware updates**: see when an update is available and install it from Home Assistant
 
 ## Installation
 
-### HACS (Recommended)
+### HACS (recommended)
 
-1. Open HACS in your Home Assistant instance
-2. Click on "Integrations"
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/HomeBrainz/ha-inkVision`
-6. Select "Integration" as the category
-7. Click "Add"
-8. Find "HomeBrainz" in the integrations list and click "Download"
-9. Restart Home Assistant
+[![Open your Home Assistant instance and open this repository in HACS.][my-hacs-badge]][my-hacs]
 
-### Manual Installation
+1. Click the button above, or open **HACS** in Home Assistant and search for **HomeBrainz**
+2. Click **Download**
+3. Restart Home Assistant
 
-1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`)
-2. If you do not have a `custom_components` directory (folder) there, you need to create it
-3. In the `custom_components` directory (folder) create a new folder called `homebrainz`
-4. Download _all_ the files from the `custom_components/homebrainz/` directory (folder) in this repository
-5. Place the files you downloaded in the new directory (folder) you created
-6. Restart Home Assistant
+### Manual installation
+
+1. Download the latest release from the [releases page][releases]
+2. Copy the `custom_components/homebrainz` folder into the `custom_components` folder of your Home Assistant configuration directory (create `custom_components` if it does not exist)
+3. Restart Home Assistant
 
 ## Configuration
 
-### Setting up the Integration
+[![Open your Home Assistant instance and start setting up HomeBrainz.][my-config-badge]][my-config]
 
-1. In Home Assistant, go to **Settings** > **Devices & Services**
-2. Click **Add Integration**
-3. Search for "HomeBrainz" and select it
-4. Enter your inkVision(R) device IP address (e.g., `192.168.1.207`)
-5. Click **Submit**
+Devices on your network are usually discovered automatically and appear under **Settings** > **Devices & Services** as ready to configure. To add a device yourself:
 
-Home Assistant auto-discovery works with current HomeBrainz and inkVision(R) mDNS variants, including `homebrainz*.local`, `HBZ*.local`, and devices that publish the dedicated `_homebrainz._tcp` service. You can always enter the host/IP manually as a fallback.
+1. Go to **Settings** > **Devices & Services**
+2. Click **Add Integration** and search for **HomeBrainz**
+3. Enter the device's IP address or hostname
 
-### Finding Your Device IP Address
-
-You can find your device's IP address by:
-- Checking your WiFi router's connected devices list
-- Using a network scanner app
-- Connecting to the device's serial console during boot
+You can find the device's IP address in your router's list of connected devices.
 
 ## Entities
 
-Once configured, the integration creates sensors and controls across multiple platforms. Core entities include:
+The integration creates the following entities, depending on your device:
 
-- `sensor.temperature`
-- `sensor.humidity`
-- `sensor.pressure`
-- `sensor.wifi_signal`
-- `sensor.gas_resistance`
-- `sensor.indoor_air_quality`
-- `sensor.static_iaq`
-- `sensor.co2_equivalent`
-- `sensor.breath_voc`
-- `sensor.iaq_rating`
-- `sensor.device_uptime` (diagnostic)
-- `sensor.display_brightness` (diagnostic)
-- `sensor.ip_address` (diagnostic)
-- `sensor.mac_address` (diagnostic)
-- `sensor.firmware_version` (diagnostic)
-- `sensor.firmware_id` (diagnostic)
-- `sensor.latest_firmware_id` (diagnostic)
-- `sensor.latest_firmware_version` (diagnostic)
-- `number.display_brightness`
-- `select.timezone`
-- `switch.screen_clock`, `switch.screen_temp`, `switch.screen_humidity`, `switch.screen_pressure`, `switch.screen_gas`, `switch.screen_iaq`
-- `binary_sensor.firmware_update_available`
-- `button.check_firmware_update`
-- `button.install_firmware_update`
-- `media_player.speaker`
-
-Entity IDs can vary by Home Assistant naming rules and your device name.
+Platform | Description
+-- | --
+`sensor` | Environment and air-quality readings, Wi-Fi signal, and device diagnostics
+`number` | Display brightness
+`select` | Device timezone
+`switch` | Screens shown in the display rotation
+`binary_sensor` | Firmware update available
+`button` | Check for and install firmware updates
+`media_player` | Speaker playback, volume, and mute
 
 ## Services
 
-The integration registers these Home Assistant services:
+- `homebrainz.set_brightness`: set the display brightness
+- `homebrainz.display_text`: show a custom text on the display
+- `homebrainz.restart_device`: restart the device
+- `homebrainz.set_screen_rotation`: choose which screens the display rotates through
+- `homebrainz.set_timezone`: set the device timezone
 
-- `homebrainz.set_brightness`
-- `homebrainz.display_text`
-- `homebrainz.restart_device`
-- `homebrainz.set_screen_rotation`
-- `homebrainz.set_timezone`
+All services take a target device and can be tried out under **Developer Tools** > **Actions**.
 
-## Device Configuration
+## Device Settings
 
-Your inkVision(R) device can be configured through its web interface. The integration provides a direct link to the device configuration page in the device information panel.
-
-### Web Interface Features
-
-- Real-time sensor readings
-- WiFi configuration
-- MQTT settings (for alternative integration methods)
-- Device information and diagnostics
+Each device has its own settings page. Open it from the device page in Home Assistant (**Visit**).
 
 ## Troubleshooting
 
-### Integration Won't Connect
+### The device cannot be added or shows as unavailable
 
-1. Verify the device IP address is correct
-2. Ensure the device is powered on and connected to your network
-3. Check that Home Assistant can reach the device (same subnet/VLAN)
-4. Verify the device's web interface is accessible by browsing to `http://[device-ip]/`
+1. Make sure the device is powered on and connected to Wi-Fi
+2. Check that Home Assistant and the device are on the same network (same subnet/VLAN)
+3. Open the device's settings page from a browser to confirm it is reachable
+4. Reload the integration under **Settings** > **Devices & Services**
 
-### Missing Sensors
+### The speaker does not play
 
-If some sensors are not appearing:
-1. Check the device's `/sensors` endpoint directly: `http://[device-ip]/sensors`
-2. Ensure all sensor hardware is properly connected
-3. Check device logs through serial console if available
+1. Make sure the device firmware is up to date
+2. Check that the volume is not muted or set very low
+3. Check the Home Assistant logs for messages from the HomeBrainz integration
 
-### Update Issues
+### Some sensors are missing
 
-If the integration stops updating:
-1. Check Home Assistant logs for connection errors
-2. Verify the device is still accessible
-3. Try reloading the integration from **Settings** > **Devices & Services**
+Sensors are created only for the hardware your device has. If an expected sensor is missing, update the firmware and reload the integration.
 
-## Contributing
+## Support
 
-If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
+Found a bug or have a feature request? Please [open an issue][issues].
 
-[integration_blueprint]: https://github.com/ludeeus/integration_blueprint
-[commits-shield]: https://img.shields.io/github/commit-activity/y/HomeBrainz/ha-inkVision.svg?style=for-the-badge
-[commits]: https://github.com/HomeBrainz/ha-inkVision/commits/main
-[hacs]: https://github.com/hacs/integration
-[hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[hacs]: https://hacs.xyz
+[hacsbadge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/HomeBrainz/ha-inkVision.svg?style=for-the-badge
-[maintenance-shield]: https://img.shields.io/badge/maintainer-%4011ado33-blue.svg?style=for-the-badge
 [releases-shield]: https://img.shields.io/github/release/HomeBrainz/ha-inkVision.svg?style=for-the-badge
 [releases]: https://github.com/HomeBrainz/ha-inkVision/releases
+[issues]: https://github.com/HomeBrainz/ha-inkVision/issues
 [homebrainz-site]: https://homebrainz.eu
 [inkvision-site]: https://inkvision.eu
-[user_profile]: https://github.com/11ado33
+[my-hacs]: https://my.home-assistant.io/redirect/hacs_repository/?owner=HomeBrainz&repository=ha-inkVision&category=integration
+[my-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
+[my-config]: https://my.home-assistant.io/redirect/config_flow_start/?domain=homebrainz
+[my-config-badge]: https://my.home-assistant.io/badges/config_flow_start.svg

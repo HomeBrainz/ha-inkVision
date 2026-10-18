@@ -3,7 +3,7 @@
   "name": "HomeBrainz",
   "codeowners": ["@11ado33"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["ffmpeg", "http"],
   "documentation": "https://github.com/HomeBrainz/ha-inkVision",
   "homekit": {},
   "iot_class": "local_push",

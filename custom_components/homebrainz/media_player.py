@@ -20,6 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import HomeBrainzDataUpdateCoordinator
+from .audio_proxy import async_setup_audio_proxy
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -227,10 +228,11 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
     async def async_media_play(self) -> None:
         """Resume playback."""
         if self._last_media_id:
+            # Re-resolve: proxy URLs are one-time and may have expired.
             success = await self.coordinator.async_speaker_command(
                 "play_media",
                 media_type=self._last_media_type,
-                media_id=self._last_media_id,
+                media_id=await self._resolve_media_id(self._last_media_id),
             )
         else:
             success = await self.coordinator.async_speaker_command("play")
@@ -277,13 +279,39 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
 
         success = await self.coordinator.async_speaker_command("play_media", **payload)
         if success:
-            self._last_media_id = resolved_media_id
+            self._last_media_id = media_id
             self._last_media_type = str(media_type)
             self._optimistic_state = MediaPlayerState.PLAYING
             self.async_write_ha_state()
 
     async def _resolve_media_id(self, media_id: str) -> str:
-        """Resolve Home Assistant media IDs to a concrete URL the device can fetch."""
+        """Resolve a media ID to a URL the device can fetch and play.
+
+        Everything except the device's own built-in sample is routed through
+        the ffmpeg audio proxy, so the firmware always receives plain-HTTP PCM
+        WAV regardless of the source's scheme, codec or container.
+        """
+        source_url = await self._resolve_source_url(media_id)
+        if source_url is None:
+            return media_id
+
+        if (urlparse(source_url).hostname or "") == self._host:
+            # Device-local URLs (e.g. /speaker/sample.wav) are played natively.
+            return source_url
+
+        proxy_path = async_setup_audio_proxy(self.hass).create(
+            self.config_entry.entry_id, source_url
+        )
+        try:
+            base = get_url(self.hass, prefer_external=False)
+        except Exception:
+            _LOGGER.warning("No internal Home Assistant URL; playing media directly")
+            return self._to_device_url(source_url)
+
+        return self._to_device_url(f"{base}{proxy_path}")
+
+    async def _resolve_source_url(self, media_id: str) -> str | None:
+        """Resolve media-source IDs and relative paths to an absolute URL."""
         resolved = media_id
 
         if media_id.startswith("media-source://"):
@@ -292,43 +320,42 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
 
                 media = await async_resolve_media(self.hass, media_id, self.entity_id)
                 resolved = media.url
-            except Exception:
-                # Keep original id; coordinator/firmware will log error if unusable.
-                return media_id
-
-        if resolved.startswith("/"):
-            try:
-                base = get_url(self.hass, prefer_external=False)
-                resolved = f"{base}{resolved}"
-            except Exception:
-                return resolved
+            except Exception as err:
+                _LOGGER.error("Failed to resolve %s: %s", media_id, err)
+                return None
 
         try:
             from homeassistant.components.media_player.browse_media import async_process_play_media_url
 
+            # Signs HA-local paths (authSig) and makes them absolute.
             resolved = async_process_play_media_url(self.hass, resolved)
         except Exception:
-            pass
-
-        # Atmos firmware currently supports plain HTTP stream URLs only.
-        # Only downgrade local-network URLs; remote HTTPS streams and HA's
-        # own signed media-source URLs must keep their scheme intact.
-        if resolved.startswith("https://"):
-            parsed = urlparse(resolved)
-            if _is_local_network_host(parsed.hostname or ""):
-                resolved = urlunparse(parsed._replace(scheme="http"))
-                _LOGGER.warning(
-                    "Downgraded local HTTPS media URL to HTTP for Atmos device compatibility: %s",
-                    resolved,
-                )
-
-        if not resolved.startswith("http://"):
-            _LOGGER.warning(
-                "Unsupported media URL for Atmos speaker (requires http://): %s",
-                resolved,
-            )
+            if resolved.startswith("/"):
+                try:
+                    resolved = f"{get_url(self.hass, prefer_external=False)}{resolved}"
+                except Exception:
+                    return None
 
         return resolved
+
+    def _to_device_url(self, url: str) -> str:
+        """Downgrade local HTTPS to HTTP; the firmware supports plain HTTP only."""
+        if url.startswith("https://"):
+            parsed = urlparse(url)
+            if _is_local_network_host(parsed.hostname or ""):
+                url = urlunparse(parsed._replace(scheme="http"))
+                _LOGGER.warning(
+                    "Downgraded local HTTPS media URL to HTTP for Atmos device compatibility: %s",
+                    url,
+                )
+
+        if not url.startswith("http://"):
+            _LOGGER.warning(
+                "Unsupported media URL for Atmos speaker (requires http://): %s",
+                url,
+            )
+
+        return url
 
     async def async_browse_media(self, media_content_type=None, media_content_id=None):
         """Browse Home Assistant media sources for this player."""

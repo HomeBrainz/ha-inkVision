@@ -16,12 +16,11 @@ from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
 
-# Must match CUSTOM_TEXT_MAX_LEN in hbdisplay's AtmosDevice.h - the device
-# truncates to this length anyway, but capping in the UI avoids surprises.
+# Maximum custom text length the firmware accepts. The device truncates to
+# this length anyway, but capping in the UI avoids surprises.
 CUSTOM_TEXT_MAX_LEN = 96
 
-# First firmware_id (see AtmosDevice.h / the backend's firmware table) that
-# understands the "display_text" WebSocket command without silently ignoring it.
+# First firmware_id that understands the "display_text" WebSocket command without silently ignoring it.
 MIN_FIRMWARE_ID_CUSTOM_TEXT = 2
 
 
