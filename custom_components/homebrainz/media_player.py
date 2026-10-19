@@ -14,14 +14,16 @@ from homeassistant.components.media_player.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.network import get_url
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import HomeBrainzDataUpdateCoordinator
-from .audio_proxy import async_setup_audio_proxy
+from .audio_proxy import FORMAT_MP3, FORMAT_WAV, async_setup_audio_proxy
 from .const import DOMAIN, MANUFACTURER, MODEL
+from .playlist import async_resolve_playlist
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -288,8 +290,10 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
         """Resolve a media ID to a URL the device can fetch and play.
 
         Everything except the device's own built-in sample is routed through
-        the ffmpeg audio proxy, so the firmware always receives plain-HTTP PCM
-        WAV regardless of the source's scheme, codec or container.
+        the ffmpeg audio proxy, so the firmware always receives a plain-HTTP
+        stream it can play, regardless of the source's scheme, codec or
+        container. Firmware that advertises speaker_wav_stream gets PCM WAV;
+        older firmware gets MP3, because its WAV path plays far quieter.
         """
         source_url = await self._resolve_source_url(media_id)
         if source_url is None:
@@ -299,8 +303,9 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
             # Device-local URLs (e.g. /speaker/sample.wav) are played natively.
             return source_url
 
+        media_format = FORMAT_WAV if self._status().get("speaker_wav_stream") is True else FORMAT_MP3
         proxy_path = async_setup_audio_proxy(self.hass).create(
-            self.config_entry.entry_id, source_url
+            self.config_entry.entry_id, source_url, media_format
         )
         try:
             base = get_url(self.hass, prefer_external=False)
@@ -336,7 +341,8 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
                 except Exception:
                     return None
 
-        return resolved
+        # ffmpeg cannot read .pls/.m3u radio playlists; use the stream inside.
+        return await async_resolve_playlist(async_get_clientsession(self.hass), resolved)
 
     def _to_device_url(self, url: str) -> str:
         """Downgrade local HTTPS to HTTP; the firmware supports plain HTTP only."""

@@ -1,11 +1,14 @@
-"""HTTP view that transcodes any media URL to plain PCM WAV for Atmos speakers.
+"""HTTP view that transcodes any media URL into a format Atmos speakers play.
 
 The Atmos firmware can only fetch plain-HTTP streams and has very little RAM
 and CPU for decoding. Most real-world sources (internet radio over HTTPS, AAC,
 HLS playlists, TTS MP3) are therefore unplayable or play choppily when handed
 to the device directly. Instead, Home Assistant runs ffmpeg and serves the
-result as uncompressed 16-bit mono WAV over plain HTTP, which the firmware
-plays without any decoding.
+result over plain HTTP:
+
+- WAV (16-bit mono PCM) for firmware that advertises ``speaker_wav_stream``;
+  the device plays it without any decoding.
+- MP3 for older firmware, whose WAV path plays far quieter than its MP3 path.
 """
 from __future__ import annotations
 
@@ -36,6 +39,18 @@ PROXY_URL_PREFIX: Final = "/api/homebrainz/audio_proxy"
 PROXY_SAMPLE_RATE: Final = 22050
 PROXY_CHANNELS: Final = 1
 
+FORMAT_WAV: Final = "wav"
+FORMAT_MP3: Final = "mp3"
+
+# Output codec arguments per format. MP3 stays at 22.05 kHz mono (MPEG-2
+# Layer III) to keep decoding cheap on the device.
+_FORMAT_ARGS: Final[dict[str, list[str]]] = {
+    # +bitexact skips the LIST/INFO chunk so the header is just fmt + data.
+    FORMAT_WAV: ["-c:a", "pcm_s16le", "-fflags", "+bitexact", "-f", "wav"],
+    FORMAT_MP3: ["-c:a", "libmp3lame", "-b:a", "64k", "-f", "mp3"],
+}
+_CONTENT_TYPES: Final[dict[str, str]] = {FORMAT_WAV: "audio/wav", FORMAT_MP3: "audio/mpeg"}
+
 _MAX_CONVERSIONS_PER_DEVICE: Final = 2
 _MAX_STDERR_LINES: Final = 32
 _PROC_WAIT_TIMEOUT: Final = 5
@@ -55,6 +70,7 @@ def _redact(text: str) -> str:
 class _Conversion:
     convert_id: str
     media_url: str
+    media_format: str
     proc: asyncio.subprocess.Process | None = None
     is_finished: bool = False
 
@@ -65,7 +81,7 @@ class AudioProxyData:
     def __init__(self) -> None:
         self.conversions: dict[str, list[_Conversion]] = {}
 
-    def create(self, device_id: str, media_url: str) -> str:
+    def create(self, device_id: str, media_url: str, media_format: str = FORMAT_WAV) -> str:
         """Register media_url and return the proxy path that serves it."""
         conversions = [
             c for c in self.conversions.get(device_id, []) if not c.is_finished
@@ -77,9 +93,9 @@ class AudioProxyData:
                     oldest.proc.kill()
 
         convert_id = secrets.token_urlsafe(16)
-        conversions.append(_Conversion(convert_id, media_url))
+        conversions.append(_Conversion(convert_id, media_url, media_format))
         self.conversions[device_id] = conversions
-        return f"{PROXY_URL_PREFIX}/{device_id}/{convert_id}.wav"
+        return f"{PROXY_URL_PREFIX}/{device_id}/{convert_id}.{media_format}"
 
     def find(self, device_id: str, convert_id: str) -> _Conversion | None:
         for conversion in self.conversions.get(device_id, []):
@@ -89,7 +105,7 @@ class AudioProxyData:
 
 
 class AudioProxyView(HomeAssistantView):
-    """Stream a registered media URL through ffmpeg as PCM WAV."""
+    """Stream a registered media URL through ffmpeg in its target format."""
 
     # The device cannot authenticate; access is gated by the unguessable id.
     requires_auth = False
@@ -104,12 +120,12 @@ class AudioProxyView(HomeAssistantView):
         self, request: web.Request, device_id: str, filename: str
     ) -> web.StreamResponse:
         convert_id, _, ext = filename.rpartition(".")
-        conversion = self.proxy_data.find(device_id, convert_id) if ext == "wav" else None
-        if conversion is None:
+        conversion = self.proxy_data.find(device_id, convert_id)
+        if conversion is None or conversion.media_format != ext:
             return web.Response(body="Invalid proxy URL", status=HTTPStatus.NOT_FOUND)
 
-        # A re-request restarts the conversion; the new response needs its own
-        # WAV header anyway.
+        # A re-request restarts the conversion; a new WAV response needs its own
+        # header anyway.
         if conversion.proc is not None and conversion.proc.returncode is None:
             with contextlib.suppress(ProcessLookupError):
                 conversion.proc.kill()
@@ -131,13 +147,7 @@ class AudioProxyView(HomeAssistantView):
             str(PROXY_CHANNELS),
             "-ar",
             str(PROXY_SAMPLE_RATE),
-            "-c:a",
-            "pcm_s16le",
-            # Skip the LIST/INFO chunk so the header is just fmt + data.
-            "-fflags",
-            "+bitexact",
-            "-f",
-            "wav",
+            *_FORMAT_ARGS[conversion.media_format],
             "pipe:",
         ]
 
@@ -152,7 +162,7 @@ class AudioProxyView(HomeAssistantView):
         conversion.proc = proc
 
         response = web.StreamResponse(status=HTTPStatus.OK)
-        response.content_type = "audio/wav"
+        response.content_type = _CONTENT_TYPES[conversion.media_format]
         await response.prepare(request)
 
         stderr_lines: deque[str] = deque(maxlen=_MAX_STDERR_LINES)
