@@ -11,7 +11,7 @@
   "loggers": ["custom_components.homebrainz"],
   "requirements": ["websockets>=11.0"],
   "ssdp": [],
-  "version": "1.0.17b1",
+  "version": "1.0.19",
   "zeroconf": [
     {
       "type": "_homebrainz._tcp.local."
