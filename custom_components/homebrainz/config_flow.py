@@ -9,10 +9,11 @@ import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TemplateSelector
 
 try:
     # Newer Home Assistant versions
@@ -20,7 +21,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for older HA cores
     from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
-from .const import DOMAIN
+from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,6 +180,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 3
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> OptionsFlowHandler:
+        """Return the options flow."""
+        return OptionsFlowHandler(config_entry)
+
     async def async_step_zeroconf(
         self,
         discovery_info: ZeroconfServiceInfo,
@@ -241,6 +248,36 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
+        )
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Custom rotation screen templates."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        # Not self.config_entry: newer cores set that themselves and warn when a flow assigns it.
+        self._entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit the template behind each custom screen slot."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        schema = {}
+        for slot in range(1, CUSTOM_SCREEN_SLOTS + 1):
+            key = f"{CONF_CUSTOM_SCREEN_PREFIX}{slot}"
+            current = self._entry.options.get(key)
+            schema[vol.Optional(key, description={"suggested_value": current} if current else None)] = (
+                TemplateSelector()
+            )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(schema),
+            # Passed as a placeholder: braces in translation strings are placeholders themselves.
+            description_placeholders={"example": "{{ states('sensor.outdoor_temperature') }}°C"},
         )
 
 

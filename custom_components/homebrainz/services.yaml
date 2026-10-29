@@ -100,3 +100,32 @@ set_timezone:
       required: true
       selector:
         text:
+set_custom_screen:
+  name: Set Custom Screen
+  description: >-
+    Set the text of a custom screen. Screens with text join the display rotation
+    after the regular screens; empty text removes the screen. A slot that has a
+    template in the integration options is overwritten the next time the template changes.
+  fields:
+    device_id:
+      name: Device
+      description: The HomeBrainz device to control
+      required: true
+      selector:
+        device:
+          integration: homebrainz
+    slot:
+      name: Slot
+      description: Custom screen slot (1-4)
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 4
+          step: 1
+    text:
+      name: Text
+      description: Text to show (up to 64 characters; longer text scrolls). Leave empty to remove the screen.
+      required: false
+      selector:
+        text:

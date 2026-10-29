@@ -8,7 +8,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -88,7 +88,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up the select platform."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([HomeBrainzTimezoneSelect(coordinator, config_entry)])
+    entities: list[SelectEntity] = [HomeBrainzTimezoneSelect(coordinator, config_entry)]
+    if coordinator.button_actions:
+        entities.extend(
+            HomeBrainzButtonActionSelect(coordinator, config_entry, button, gesture)
+            for button in ("button1", "button2")
+            for gesture in ("singleTap", "longPress")
+        )
+    async_add_entities(entities)
 
 
 class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
@@ -151,3 +158,88 @@ class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
         success = await self.coordinator.async_set_timezone(option)
         if not success:
             raise HomeAssistantError("Unable to set timezone on HomeBrainz device.")
+
+
+# HA option -> firmware action name. Options are snake_case for translations.
+BUTTON_ACTIONS = {
+    "none": "none",
+    "brightness_up": "brightnessUp",
+    "brightness_down": "brightnessDown",
+    "next_screen": "nextScreen",
+    "prev_screen": "prevScreen",
+    "toggle_screen": "toggleScreen",
+}
+GESTURE_NAMES = {"singleTap": "tap", "longPress": "long press"}
+
+
+class HomeBrainzButtonActionSelect(CoordinatorEntity, SelectEntity):
+    """What one button gesture does on the device itself.
+
+    "none" leaves the gesture to Home Assistant automations (event entities).
+    """
+
+    _attr_icon = "mdi:gesture-tap-button"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = list(BUTTON_ACTIONS)
+    _attr_translation_key = "button_action"
+
+    def __init__(
+        self,
+        coordinator: HomeBrainzDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        button: str,
+        gesture: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self.config_entry = config_entry
+        self._host = config_entry.data["host"]
+        self._button = button
+        self._gesture = gesture
+        self._attr_name = f"Button {button[-1]} {GESTURE_NAMES[gesture]} action"
+        self._attr_unique_id = f"{config_entry.entry_id}_{button}_{gesture}_action"
+
+    @property
+    def available(self) -> bool:
+        return super().available and bool(self.coordinator.button_actions)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        device_name = "HomeBrainz Clock"
+        mac_address = ""
+
+        status = {}
+        if self.coordinator.data:
+            status = self.coordinator.data.get("status", {}) or {}
+            if isinstance(status, dict):
+                device_name = status.get("device", device_name)
+                mac_address = status.get("mac_address", mac_address)
+
+        return DeviceInfo(
+            identifiers={(DOMAIN, mac_address or self._host)},
+            name=device_name,
+            manufacturer=MANUFACTURER,
+            model=MODEL,
+            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
+            configuration_url=f"http://{self._host}",
+        )
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the gesture's current action."""
+        action = (self.coordinator.button_actions.get(self._button) or {}).get(self._gesture)
+        for option, firmware_name in BUTTON_ACTIONS.items():
+            if firmware_name == action:
+                return option
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the gesture's action on the device."""
+        if option not in BUTTON_ACTIONS:
+            raise HomeAssistantError(f"Unsupported button action: {option}")
+
+        success = await self.coordinator.async_set_button_action(
+            self._button, self._gesture, BUTTON_ACTIONS[option]
+        )
+        if not success:
+            raise HomeAssistantError("Unable to set the button action on HomeBrainz device.")

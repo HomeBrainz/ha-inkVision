@@ -19,5 +19,33 @@
       "cannot_connect": "Discovered device could not be reached",
       "invalid_device": "Discovered service is not a HomeBrainz device"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Custom screens",
+        "description": "Templates for up to 4 custom screens. Each one with text joins the display rotation after the regular screens and updates whenever its template changes. Leave a field empty to remove that screen. Example: `{example}`. Long text scrolls. Needs firmware with custom screen support.",
+        "data": {
+          "custom_screen_1": "Custom screen 1",
+          "custom_screen_2": "Custom screen 2",
+          "custom_screen_3": "Custom screen 3",
+          "custom_screen_4": "Custom screen 4"
+        }
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "button_action": {
+        "state": {
+          "none": "None (Home Assistant only)",
+          "brightness_up": "Brightness up",
+          "brightness_down": "Brightness down",
+          "next_screen": "Next screen",
+          "prev_screen": "Previous screen",
+          "toggle_screen": "Screen on/off"
+        }
+      }
+    }
   }
 }

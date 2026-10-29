@@ -61,10 +61,11 @@ Platform | Description
 -- | --
 `sensor` | Environment and air-quality readings, Wi-Fi signal, and device diagnostics
 `number` | Display brightness
-`select` | Device timezone
+`select` | Device timezone, and what each button tap / long press does on the clock
 `switch` | Screens shown in the display rotation
 `binary_sensor` | Firmware update available
 `button` | Check for and install firmware updates
+`event` | Button 1 / Button 2 touch gestures (`single_tap`, `long_press`) on the Atmos Smart Clock
 `media_player` | Speaker playback, volume, and mute
 
 ## Services
@@ -74,8 +75,31 @@ Platform | Description
 - `homebrainz.restart_device`: restart the device
 - `homebrainz.set_screen_rotation`: choose which screens the display rotates through
 - `homebrainz.set_timezone`: set the device timezone
+- `homebrainz.set_custom_screen`: set the text of a custom screen (slot 1-4); empty text removes it
 
 All services take a target device and can be tried out under **Developer Tools** > **Actions**.
+
+## Button Automations
+
+Each touch button of the Atmos Smart Clock has an event entity that fires on every single tap and long press, so you can use it as an automation trigger. The event's `action` attribute tells you what the clock did itself. If you want a button to do nothing on the clock and only trigger your automation, set its action to **None (Home Assistant only)**, either with the button action selects on the device page or in the HomeBrainz app.
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.atmos_smart_clock_button_1
+    attribute: event_type
+    to: long_press
+actions:
+  - action: light.toggle
+    target:
+      entity_id: light.living_room
+```
+
+## Custom Screens
+
+The clock can show up to 4 custom screens in its rotation, after the regular screens. Set them under **Settings** > **Devices & services** > **HomeBrainz** > **Configure** as templates, for example `{{ states('sensor.outdoor_temperature') }}°C`. A screen updates whenever its template's result changes. Text longer than the display scrolls. Leave a field empty to remove that screen. You can also set screens from automations with `homebrainz.set_custom_screen`.
+
+The clock doesn't store custom screens. Home Assistant sends them again whenever it reconnects, and clears them when the integration is unloaded.
 
 ## Device Settings
 

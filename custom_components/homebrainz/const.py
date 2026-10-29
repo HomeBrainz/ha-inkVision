@@ -13,6 +13,10 @@ DEFAULT_SCAN_INTERVAL = 30
 # Configuration
 CONF_HOST = "host"
 
+# Custom rotation screens: options "custom_screen_1".."custom_screen_4" hold templates
+CONF_CUSTOM_SCREEN_PREFIX = "custom_screen_"
+CUSTOM_SCREEN_SLOTS = 4
+
 # Sensor types
 SENSOR_TEMPERATURE = "temperature"
 SENSOR_HUMIDITY = "humidity"
