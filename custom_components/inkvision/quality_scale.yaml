@@ -18,10 +18,11 @@ rules:
     status: done
     comment: The coordinator is in coordinator.py, and the shared device_info is in the InkVisionEntity base class in entity.py.
   config-flow:
-    status: todo
+    status: done
     comment: >-
-      User and zeroconf steps exist, but zeroconf creates the entry without asking the user
-      (needs a discovery_confirm step) and the host field has no data_description.
+      User, zeroconf (with a discovery_confirm step) and reconfigure steps; the host field has a
+      data_description. The firmware advertises no MAC in its mDNS TXT records, so zeroconf has to
+      probe the device over HTTP before it can set the unique ID.
   config-flow-test-coverage:
     status: done
     comment: tests/test_config_flow.py covers config_flow.py at 100%.
@@ -150,8 +151,8 @@ rules:
     status: todo
     comment: Icons are set with _attr_icon and in sensor descriptions; move them to icons.json.
   reconfiguration-flow:
-    status: todo
-    comment: No reconfigure step to change the host.
+    status: done
+    comment: The reconfigure step changes the host and aborts when the address belongs to a different device.
   repair-issues:
     status: exempt
     comment: No user-fixable conditions yet; a firmware-too-old issue would be a candidate.

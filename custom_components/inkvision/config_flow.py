@@ -183,6 +183,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 3
 
+    _discovered: dict[str, Any]
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> OptionsFlowHandler:
@@ -219,9 +221,27 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {**old.data, CONF_HOST: info["host"], CONF_MIGRATE_FROM: old.entry_id}
             )
 
-        return self.async_create_entry(
-            title=info["title"],
-            data={CONF_HOST: info["host"]},
+        self._discovered = info
+        self.context["title_placeholders"] = {"name": info["title"]}
+        return await self.async_step_discovery_confirm()
+
+    async def async_step_discovery_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask the user before adding a discovered device."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._discovered["title"],
+                data={CONF_HOST: self._discovered["host"]},
+            )
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="discovery_confirm",
+            description_placeholders={
+                "name": self._discovered["title"],
+                "host": self._discovered["host"],
+            },
         )
 
     @callback
@@ -285,6 +305,40 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Change the host of a configured device."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                info = await validate_input(self.hass, user_input)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidDevice:
+                errors["base"] = "invalid_device"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception")
+                errors["base"] = "unknown"
+            else:
+                if info["mac_address"]:
+                    # Firmware without a MAC is keyed by its host, which is what changes here.
+                    await self.async_set_unique_id(info["mac_address"])
+                    self._abort_if_unique_id_mismatch(reason="wrong_device")
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_HOST: info["host"]}
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA, user_input or {CONF_HOST: entry.data[CONF_HOST]}
+            ),
             errors=errors,
         )
 

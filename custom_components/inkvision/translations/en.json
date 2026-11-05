@@ -1,11 +1,29 @@
 {
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
         "title": "inkVision",
         "description": "Set up your inkVision device",
         "data": {
           "host": "Device IP Address or Hostname"
+        },
+        "data_description": {
+          "host": "The IP address or hostname of the device on your network, for example 192.168.1.50."
+        }
+      },
+      "discovery_confirm": {
+        "title": "Discovered inkVision device",
+        "description": "Do you want to add {name} ({host}) to Home Assistant?"
+      },
+      "reconfigure": {
+        "title": "Reconfigure inkVision device",
+        "description": "Change the address Home Assistant uses to reach the device.",
+        "data": {
+          "host": "Device IP Address or Hostname"
+        },
+        "data_description": {
+          "host": "The IP address or hostname of the device on your network, for example 192.168.1.50."
         }
       }
     },
@@ -18,7 +36,9 @@
       "already_configured": "Device is already configured",
       "cannot_connect": "Discovered device could not be reached",
       "invalid_device": "Discovered service is not an inkVision device",
-      "legacy_entry_missing": "The HomeBrainz entry to take over no longer exists"
+      "legacy_entry_missing": "The HomeBrainz entry to take over no longer exists",
+      "reconfigure_successful": "The device address was updated.",
+      "wrong_device": "The device at this address is a different inkVision device."
     }
   },
   "options": {

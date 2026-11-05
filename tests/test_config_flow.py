@@ -18,6 +18,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.inkvision.config_flow import (
+    InvalidDevice,
     _decode_discovery_value,
     _extract_device_info,
     normalize_host,
@@ -255,12 +256,18 @@ async def test_zeroconf_flow(
     mock_setup_entry: AsyncMock,
     discovery_info: ZeroconfServiceInfo,
 ) -> None:
-    """Test every zeroconf matcher in the manifest leads to an entry."""
+    """Test every zeroconf matcher in the manifest leads to an entry once confirmed."""
     aioclient_mock.get(f"{BASE_URL}/api/info", json=INFO_PAYLOAD)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
     )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "discovery_confirm"
+    assert result["description_placeholders"] == {"name": "Atmos Smart Clock", "host": HOST}
+    assert not mock_setup_entry.mock_calls
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -357,6 +364,7 @@ async def test_zeroconf_flow_without_mac_uses_host_as_unique_id(
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_ZEROCONF}, data=_zeroconf_info()
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Bento Bar"
@@ -460,3 +468,105 @@ def test_extract_device_info_markers(payload: dict[str, Any], title: str) -> Non
 def test_extract_device_info_rejects_unmarked_payload() -> None:
     """Test a JSON object with no inkVision markers is not identified as one."""
     assert _extract_device_info({"status": "ok", "uptime": 12}, HOST) is None
+
+
+async def test_reconfigure_flow(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_setup_entry: AsyncMock,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test the host can be changed, and errors keep the form open."""
+    mock_config_entry.add_to_hass(hass)
+    new_host = "192.168.1.77"
+    aioclient_mock.get(f"http://{new_host}/api/info", exc=aiohttp.ClientError())
+    aioclient_mock.get(f"http://{new_host}/status", exc=aiohttp.ClientError())
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: new_host}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"http://{new_host}/api/info", json=INFO_PAYLOAD)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: f"http://{new_host}/"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert mock_config_entry.data[CONF_HOST] == new_host
+
+
+@pytest.mark.parametrize(
+    ("mock_kwargs", "error"),
+    [
+        ({"json": {"device": "Shelly Plug"}}, "invalid_device"),
+        ({"exc": RuntimeError()}, "unknown"),
+    ],
+)
+async def test_reconfigure_flow_errors(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    mock_kwargs: dict[str, Any],
+    error: str,
+) -> None:
+    """Test a non-inkVision device or an unexpected error keeps the form open."""
+    mock_config_entry.add_to_hass(hass)
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+
+    with patch(
+        "custom_components.inkvision.config_flow.validate_input",
+        side_effect=InvalidDevice if error == "invalid_device" else RuntimeError,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "192.168.1.77"}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": error}
+
+
+async def test_reconfigure_flow_wrong_device(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test pointing an entry at a different device aborts and keeps the old host."""
+    mock_config_entry.add_to_hass(hass)
+    new_host = "192.168.1.77"
+    aioclient_mock.get(
+        f"http://{new_host}/api/info", json={**INFO_PAYLOAD, "mac_address": "11:22:33:44:55:66"}
+    )
+
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: new_host}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "wrong_device"
+    assert mock_config_entry.data[CONF_HOST] == HOST
+
+
+async def test_reconfigure_flow_without_mac(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_setup_entry: AsyncMock,
+) -> None:
+    """Test firmware without a MAC (entry keyed by host) can still move to a new host."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=HOST, version=3)
+    entry.add_to_hass(hass)
+    new_host = "192.168.1.77"
+    aioclient_mock.get(f"http://{new_host}/api/info", json={"model": "Bento Bar"})
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: new_host}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HOST] == new_host
