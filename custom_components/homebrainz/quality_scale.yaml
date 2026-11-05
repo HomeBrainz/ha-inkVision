@@ -1,0 +1,169 @@
+# Integration Quality Scale self-assessment, prepared for the HA core submission.
+# Rules: https://developers.home-assistant.io/docs/core/integration-quality-scale/rules
+# Target: Gold (minimum for Works with Home Assistant), Platinum if feasible.
+rules:
+  # Bronze
+  action-setup:
+    status: todo
+    comment: Services are registered in async_setup_entry when the first entry loads; move to async_setup.
+  appropriate-polling:
+    status: done
+    comment: WebSocket push is primary; HTTP polling every 5 minutes is only a fallback.
+  brands:
+    status: todo
+    comment: Only a local brand/ folder; core needs a home-assistant/brands PR (depends on the InkVision rebrand).
+  common-modules:
+    status: todo
+    comment: Move the coordinator out of __init__.py into coordinator.py and the duplicated device_info into a base entity in entity.py.
+  config-flow:
+    status: todo
+    comment: >-
+      User and zeroconf steps exist, but zeroconf creates the entry without asking the user
+      (needs a discovery_confirm step) and the host field has no data_description.
+  config-flow-test-coverage:
+    status: todo
+    comment: No tests yet.
+  dependency-transparency:
+    status: todo
+    comment: >-
+      The device protocol (WebSocket/HTTP client) lives in the integration. Core requires it in a
+      separate, open-source library published to PyPI by CI.
+  docs-actions:
+    status: todo
+    comment: Needs the home-assistant.io integration page.
+  docs-conditions:
+    status: exempt
+    comment: The integration provides no conditions.
+  docs-high-level-description:
+    status: todo
+  docs-installation-instructions:
+    status: todo
+  docs-removal-instructions:
+    status: todo
+  docs-triggers:
+    status: exempt
+    comment: The integration provides no triggers; button gestures are event entities.
+  entity-event-setup:
+    status: done
+    comment: The event entity subscribes in async_added_to_hass and unsubscribes via async_on_remove.
+  entity-unique-id:
+    status: done
+    comment: All entities have unique IDs, but they are derived from the config entry ID; prefer the device MAC.
+  has-entity-name:
+    status: todo
+    comment: No entity sets _attr_has_entity_name; names are hard-coded strings.
+  runtime-data:
+    status: todo
+    comment: The coordinator is stored in hass.data[DOMAIN]; use entry.runtime_data with a typed ConfigEntry.
+  test-before-configure:
+    status: done
+    comment: validate_input probes /api/info and /status before creating the entry.
+  test-before-setup:
+    status: done
+    comment: async_config_entry_first_refresh raises ConfigEntryNotReady when the device is unreachable.
+  unique-config-entry:
+    status: done
+    comment: The unique ID is the device MAC (falls back to the host when the firmware does not report one).
+
+  # Silver
+  action-exceptions:
+    status: todo
+    comment: >-
+      Most services log an error and return when the device is missing or the command fails;
+      they should raise ServiceValidationError / HomeAssistantError.
+  config-entry-unloading:
+    status: done
+  docs-configuration-parameters:
+    status: todo
+    comment: Document the custom screen templates in the options flow.
+  docs-installation-parameters:
+    status: todo
+  entity-unavailable:
+    status: done
+    comment: Coordinator entities go unavailable when polling fails; a dropped WebSocket triggers an immediate poll.
+  integration-owner:
+    status: done
+  log-when-unavailable:
+    status: done
+    comment: The WebSocket logs one warning per outage; the coordinator logs once on failure and once on recovery.
+  parallel-updates:
+    status: todo
+    comment: No platform sets PARALLEL_UPDATES.
+  reauthentication-flow:
+    status: exempt
+    comment: >-
+      Devices have no authentication today. Becomes required if the security roadmap adds
+      device credentials or tokens.
+  test-coverage:
+    status: todo
+    comment: Needs over 95% coverage across all modules.
+
+  # Gold
+  devices:
+    status: done
+    comment: One device per entry; identifiers fall back to the host when the MAC is missing, so prefer entry.unique_id.
+  diagnostics:
+    status: todo
+  discovery:
+    status: done
+    comment: Zeroconf (_homebrainz._tcp and name-matched _http._tcp services).
+  discovery-update-info:
+    status: done
+    comment: Rediscovery updates the host of the existing entry.
+  docs-data-update:
+    status: todo
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: todo
+  docs-supported-devices:
+    status: todo
+  docs-supported-functions:
+    status: todo
+  docs-troubleshooting:
+    status: todo
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: exempt
+    comment: Each config entry is a single device.
+  entity-category:
+    status: done
+    comment: Diagnostic and config categories are set on firmware, network and button-action entities.
+  entity-device-class:
+    status: done
+    comment: Device classes are set where one exists (CO2, VOC, duration, update, button).
+  entity-disabled-by-default:
+    status: todo
+    comment: Noisy diagnostics (IP, MAC, firmware ID, uptime) should be disabled by default.
+  entity-translations:
+    status: todo
+    comment: Only the button action select uses a translation_key.
+  exception-translations:
+    status: todo
+    comment: Exceptions use hard-coded English messages; strings.json has no exceptions section.
+  icon-translations:
+    status: todo
+    comment: Icons are set with _attr_icon and in sensor descriptions; move them to icons.json.
+  reconfiguration-flow:
+    status: todo
+    comment: No reconfigure step to change the host.
+  repair-issues:
+    status: exempt
+    comment: No user-fixable conditions yet; a firmware-too-old issue would be a candidate.
+  stale-devices:
+    status: exempt
+    comment: One device per entry; removing the entry removes the device.
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: Depends on the library split; the library must be fully async.
+  inject-websession:
+    status: todo
+    comment: >-
+      HTTP already uses HA's shared session, but the WebSocket opens its own connection with the
+      websockets package. Switching to aiohttp ws_connect on the injected session drops that dependency.
+  strict-typing:
+    status: todo
+    comment: Many functions lack type hints; the library and integration need to pass mypy --strict.
