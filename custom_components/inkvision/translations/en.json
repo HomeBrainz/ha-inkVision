@@ -69,5 +69,13 @@
       "title": "{title} is set up twice",
       "description": "{title} was added to inkVision and also still exists under the old HomeBrainz name. Remove the HomeBrainz entry under **Settings** > **Devices & services**."
     }
+  },
+  "exceptions": {
+    "device_not_found": {
+      "message": "No inkVision device with ID {device_id}."
+    },
+    "device_not_loaded": {
+      "message": "{device} is not loaded. Check that it is online and enabled."
+    }
   }
 }

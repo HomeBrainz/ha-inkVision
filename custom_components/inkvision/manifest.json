@@ -11,6 +11,7 @@
   ],
   "documentation": "https://github.com/HomeBrainz/ha-inkVision",
   "homekit": {},
+  "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/HomeBrainz/ha-inkVision/issues",
   "loggers": [

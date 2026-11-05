@@ -1,21 +1,21 @@
 """Select platform for inkVision integration."""
 from __future__ import annotations
 
-from copy import deepcopy
 import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import InkVisionDataUpdateCoordinator
-from .const import DOMAIN, MANUFACTURER, MODEL
+from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
+from .entity import InkVisionEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 1
 
 # Supported IANA timezones (must match ESP tz_lookup.h)
 SUPPORTED_TIMEZONES = [
@@ -83,11 +83,11 @@ SUPPORTED_TIMEZONES = [
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: InkVisionConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the select platform."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
     entities: list[SelectEntity] = [InkVisionTimezoneSelect(coordinator, config_entry)]
     if coordinator.button_actions:
         entities.extend(
@@ -98,7 +98,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class InkVisionTimezoneSelect(CoordinatorEntity, SelectEntity):
+class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
     """Select entity for device timezone."""
 
     _attr_name = "Timezone"
@@ -114,28 +114,6 @@ class InkVisionTimezoneSelect(CoordinatorEntity, SelectEntity):
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
         self._attr_unique_id = f"{config_entry.entry_id}_timezone"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        device_name = "inkVision"
-        mac_address = ""
-
-        status = {}
-        if self.coordinator.data:
-            status = self.coordinator.data.get("status", {}) or {}
-            if isinstance(status, dict):
-                device_name = status.get("device", device_name)
-                mac_address = status.get("mac_address", mac_address)
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, mac_address or self._host)},
-            name=device_name,
-            manufacturer=MANUFACTURER,
-            model=MODEL,
-            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
-            configuration_url=f"http://{self._host}",
-        )
 
     @property
     def current_option(self) -> str | None:
@@ -172,7 +150,7 @@ BUTTON_ACTIONS = {
 GESTURE_NAMES = {"singleTap": "tap", "longPress": "long press"}
 
 
-class InkVisionButtonActionSelect(CoordinatorEntity, SelectEntity):
+class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
     """What one button gesture does on the device itself.
 
     "none" leaves the gesture to Home Assistant automations (event entities).
@@ -201,28 +179,6 @@ class InkVisionButtonActionSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         return super().available and bool(self.coordinator.button_actions)
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        device_name = "inkVision"
-        mac_address = ""
-
-        status = {}
-        if self.coordinator.data:
-            status = self.coordinator.data.get("status", {}) or {}
-            if isinstance(status, dict):
-                device_name = status.get("device", device_name)
-                mac_address = status.get("mac_address", mac_address)
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, mac_address or self._host)},
-            name=device_name,
-            manufacturer=MANUFACTURER,
-            model=MODEL,
-            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
-            configuration_url=f"http://{self._host}",
-        )
 
     @property
     def current_option(self) -> str | None:

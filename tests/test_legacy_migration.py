@@ -127,7 +127,8 @@ async def test_legacy_service_alias(
     }
 
     await _unload_all(hass)
-    assert not hass.services.has_service(LEGACY_DOMAIN, "restart_device")
+    # Registered in async_setup like the actions themselves, so they outlive the entries.
+    assert hass.services.has_service(LEGACY_DOMAIN, "restart_device")
 
 
 async def test_no_legacy_install(hass: HomeAssistant) -> None:

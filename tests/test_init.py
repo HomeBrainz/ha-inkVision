@@ -10,14 +10,14 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from websockets.exceptions import ConnectionClosedError
 
-from custom_components.inkvision import InkVisionDataUpdateCoordinator
+from custom_components.inkvision.coordinator import InkVisionDataUpdateCoordinator
 from custom_components.inkvision.const import DOMAIN
 
 from .conftest import (
@@ -40,7 +40,7 @@ SERVICES = {
 
 
 def _coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> InkVisionDataUpdateCoordinator:
-    return hass.data[DOMAIN][entry.entry_id]
+    return entry.runtime_data
 
 
 def _device_id(hass: HomeAssistant) -> str:
@@ -84,8 +84,8 @@ async def test_setup_and_unload(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.NOT_LOADED
-    assert hass.services.async_services_for_domain(DOMAIN) == {}
-    assert entry.entry_id not in hass.data[DOMAIN]
+    # Actions are registered in async_setup and outlive the entries.
+    assert set(hass.services.async_services_for_domain(DOMAIN)) == SERVICES
     # Slots are blanked so the device doesn't keep stale text while unloaded.
     assert websocket.sent == [
         {"command": "set_custom_screen", "slot": slot, "text": ""} for slot in range(1, 5)
@@ -93,13 +93,13 @@ async def test_setup_and_unload(
     websocket.close.assert_awaited_once()
 
 
-async def test_services_stay_until_last_entry_unloads(
+async def test_services_route_to_their_device(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
     mock_websocket: FakeWebSocketFactory,
 ) -> None:
-    """Test a second device shares the services with the first."""
+    """Test actions reach each device's own entry, and fail for an unloaded one."""
     second_host = "192.168.1.51"
     for path, payload in (
         ("sensors", {}),
@@ -117,13 +117,26 @@ async def test_services_stay_until_last_entry_unloads(
     assert await hass.config_entries.async_setup(second.entry_id)
     await hass.async_block_till_done()
 
-    assert await hass.config_entries.async_unload(init_integration.entry_id)
-    await hass.async_block_till_done()
-    assert set(hass.services.async_services_for_domain(DOMAIN)) == SERVICES
+    second_device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, "11:22:33:44:55:66")}
+    )
+    second_ws = mock_websocket.current
+    second_ws.send.reset_mock()
+    await hass.services.async_call(
+        DOMAIN, "restart_device", {"device_id": second_device.id}, blocking=True
+    )
+    assert second_ws.sent == [{"command": "restart"}]
 
     assert await hass.config_entries.async_unload(second.entry_id)
     await hass.async_block_till_done()
-    assert hass.services.async_services_for_domain(DOMAIN) == {}
+    assert set(hass.services.async_services_for_domain(DOMAIN)) == SERVICES
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN, "restart_device", {"device_id": second_device.id}, blocking=True
+        )
+    assert err.value.translation_key == "device_not_loaded"
+    assert err.value.translation_placeholders == {"device": "Atmos 2"}
 
 
 @pytest.mark.parametrize(
@@ -358,7 +371,7 @@ async def test_websocket_reconnects(
     mock_websocket.connected.clear()
     mock_websocket.side_effects.append(OSError("unreachable"))
 
-    with patch("custom_components.inkvision.WEBSOCKET_RETRY_DELAY", 0):
+    with patch("custom_components.inkvision.coordinator.WEBSOCKET_RETRY_DELAY", 0):
         await first.messages.put(ConnectionClosedError(None, None))
         second = await mock_websocket.wait_listening()
         await hass.async_block_till_done()
@@ -381,7 +394,7 @@ async def test_websocket_unexpected_error_retries(
     first = mock_websocket.current
     mock_websocket.connected.clear()
 
-    with patch("custom_components.inkvision.WEBSOCKET_RETRY_DELAY", 0):
+    with patch("custom_components.inkvision.coordinator.WEBSOCKET_RETRY_DELAY", 0):
         await first.messages.put(RuntimeError("boom"))
         second = await mock_websocket.wait_listening()
 
@@ -482,9 +495,8 @@ async def test_services_when_websocket_down(
 async def test_services_unknown_device(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test services ignore device ids that don't belong to a loaded entry."""
+    """Test actions reject device IDs that aren't inkVision devices."""
     other_entry = MockConfigEntry(domain="other")
     other_entry.add_to_hass(hass)
     foreign = dr.async_get(hass).async_get_or_create(
@@ -500,12 +512,11 @@ async def test_services_unknown_device(
             ("set_timezone", {"timezone": "Etc/UTC"}),
             ("set_custom_screen", {"slot": 1}),
         ):
-            await hass.services.async_call(
-                DOMAIN, service, {"device_id": device_id, **data}, blocking=True
-            )
-
-    assert "Device missing not found" in caplog.text
-    assert f"No coordinator found for device {foreign.id}" in caplog.text
+            with pytest.raises(ServiceValidationError) as err:
+                await hass.services.async_call(
+                    DOMAIN, service, {"device_id": device_id, **data}, blocking=True
+                )
+            assert err.value.translation_key == "device_not_found"
 
 
 async def test_service_set_screen_rotation(

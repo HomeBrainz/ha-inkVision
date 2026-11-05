@@ -15,17 +15,17 @@ from homeassistant.components.media_player.const import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.network import get_url
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.network import get_url
 
-from . import InkVisionDataUpdateCoordinator
 from .audio_proxy import FORMAT_MP3, FORMAT_WAV, async_setup_audio_proxy
-from .const import DOMAIN, MANUFACTURER, MODEL
+from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
+from .entity import InkVisionEntity
 from .playlist import async_resolve_playlist
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 1
 
 
 def _is_local_network_host(hostname: str) -> bool:
@@ -55,15 +55,15 @@ SPEAKER_FEATURES = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: InkVisionConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the media_player platform."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
     async_add_entities([InkVisionSpeakerEntity(coordinator, config_entry)])
 
 
-class InkVisionSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
+class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
     """inkVision speaker exposed as a Home Assistant media player."""
 
     _attr_name = "Speaker"
@@ -86,28 +86,6 @@ class InkVisionSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
         self._optimistic_is_muted = False
         self._last_media_id: str | None = None
         self._last_media_type: str = str(MediaType.MUSIC)
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        device_name = "inkVision"
-        mac_address = ""
-
-        status = {}
-        if self.coordinator.data:
-            status = self.coordinator.data.get("status", {}) or {}
-            if isinstance(status, dict):
-                device_name = status.get("device", device_name)
-                mac_address = status.get("mac_address", mac_address)
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, mac_address or self._host)},
-            name=device_name,
-            manufacturer=MANUFACTURER,
-            model=MODEL,
-            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
-            configuration_url=f"http://{self._host}",
-        )
 
     def _status(self) -> dict[str, Any]:
         if not self.coordinator.data:
@@ -330,7 +308,9 @@ class InkVisionSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
                 return None
 
         try:
-            from homeassistant.components.media_player.browse_media import async_process_play_media_url
+            from homeassistant.components.media_player.browse_media import (
+                async_process_play_media_url,
+            )
 
             # Signs HA-local paths (authSig) and makes them absolute.
             resolved = async_process_play_media_url(self.hass, resolved)

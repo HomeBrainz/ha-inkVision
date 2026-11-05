@@ -163,7 +163,7 @@ async def test_brightness_number(
     assert websocket.sent == [{"command": "set_brightness", "value": 12}]
     assert hass.states.get(entity_id).state == "12"
 
-    hass.data[DOMAIN][init_integration.entry_id]._websocket_connected = False
+    init_integration.runtime_data._websocket_connected = False
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             NUMBER_DOMAIN,

@@ -6,14 +6,14 @@ import logging
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import InkVisionDataUpdateCoordinator
-from .const import DOMAIN, MANUFACTURER, MODEL
+from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
+from .entity import InkVisionEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 BUTTON_COUNT = 2
 EVENT_TYPES = ["single_tap", "long_press"]
@@ -32,11 +32,11 @@ def _has_buttons(status: dict) -> bool:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: InkVisionConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the event platform."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
     status = (coordinator.data or {}).get("status", {}) or {}
     if not _has_buttons(status):
         return
@@ -47,7 +47,7 @@ async def async_setup_entry(
     )
 
 
-class InkVisionButtonEvent(CoordinatorEntity, EventEntity):
+class InkVisionButtonEvent(InkVisionEntity, EventEntity):
     """Fires on a single tap or long press of one of the device's buttons.
 
     Gestures fire whatever the button's on-device action is; set the action to
@@ -78,28 +78,6 @@ class InkVisionButtonEvent(CoordinatorEntity, EventEntity):
             return False
         status = self.coordinator.data.get("status", {}) or {}
         return bool(status.get("button_events"))
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        device_name = "inkVision"
-        mac_address = ""
-
-        status = {}
-        if self.coordinator.data:
-            status = self.coordinator.data.get("status", {}) or {}
-            if isinstance(status, dict):
-                device_name = status.get("device", device_name)
-                mac_address = status.get("mac_address", mac_address)
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, mac_address or self._host)},
-            name=device_name,
-            manufacturer=MANUFACTURER,
-            model=MODEL,
-            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
-            configuration_url=f"http://{self._host}",
-        )
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to button pushes from the coordinator."""

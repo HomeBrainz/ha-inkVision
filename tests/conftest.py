@@ -200,7 +200,7 @@ class FakeWebSocketFactory:
 def mock_websocket() -> Generator[FakeWebSocketFactory]:
     """Patch the integration's WebSocket client."""
     factory = FakeWebSocketFactory()
-    with patch("custom_components.inkvision.websockets.connect", factory):
+    with patch("custom_components.inkvision.coordinator.websockets.connect", factory):
         yield factory
 
 

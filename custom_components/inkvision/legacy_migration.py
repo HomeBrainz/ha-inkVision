@@ -46,8 +46,6 @@ ISSUE_LEGACY_FOLDER = "legacy_folder"
 ISSUE_LEGACY_SERVICE_PREFIX = "legacy_service_"
 ISSUE_LEGACY_DUPLICATE_PREFIX = "legacy_duplicate_"
 
-DATA_LEGACY_ALIASES = f"{DOMAIN}_legacy_aliases"
-
 
 def legacy_folder(hass: HomeAssistant) -> Path:
     """Return where HACS left the pre-rename integration."""
@@ -194,7 +192,6 @@ def async_register_service_aliases(
     services: dict[str, tuple[Callable[[ServiceCall], Coroutine[Any, Any, None]], vol.Schema]],
 ) -> None:
     """Keep "homebrainz.<action>" working; each use raises a repair issue naming the new action."""
-    aliases: set[str] = hass.data.setdefault(DATA_LEGACY_ALIASES, set())
     for name, (handler, schema) in services.items():
         if hass.services.has_service(LEGACY_DOMAIN, name):
             # The old integration is still installed and registered it itself.
@@ -216,11 +213,4 @@ def async_register_service_aliases(
             await handler(call)
 
         hass.services.async_register(LEGACY_DOMAIN, name, alias, schema=schema)
-        aliases.add(name)
 
-
-@callback
-def async_remove_service_aliases(hass: HomeAssistant) -> None:
-    """Remove the aliases this integration registered."""
-    for name in hass.data.pop(DATA_LEGACY_ALIASES, set()):
-        hass.services.async_remove(LEGACY_DOMAIN, name)

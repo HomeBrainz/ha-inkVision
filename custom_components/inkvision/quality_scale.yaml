@@ -4,17 +4,19 @@
 rules:
   # Bronze
   action-setup:
-    status: todo
-    comment: Services are registered in async_setup_entry when the first entry loads; move to async_setup.
+    status: done
+    comment: >-
+      Registered in async_setup (services.py). Actions raise ServiceValidationError when the
+      device is unknown or its entry is not loaded.
   appropriate-polling:
     status: done
     comment: WebSocket push is primary; HTTP polling every 5 minutes is only a fallback.
   brands:
     status: todo
-    comment: Only a local brand/ folder; core needs a home-assistant/brands PR (depends on the InkVision rebrand).
+    comment: Only a local brand/ folder; core needs a home-assistant/brands PR with the inkVision icons.
   common-modules:
-    status: todo
-    comment: Move the coordinator out of __init__.py into coordinator.py and the duplicated device_info into a base entity in entity.py.
+    status: done
+    comment: The coordinator is in coordinator.py, and the shared device_info is in the InkVisionEntity base class in entity.py.
   config-flow:
     status: todo
     comment: >-
@@ -53,8 +55,8 @@ rules:
     status: todo
     comment: No entity sets _attr_has_entity_name; names are hard-coded strings.
   runtime-data:
-    status: todo
-    comment: The coordinator is stored in hass.data[DOMAIN]; use entry.runtime_data with a typed ConfigEntry.
+    status: done
+    comment: The coordinator is in entry.runtime_data, typed as InkVisionConfigEntry.
   test-before-configure:
     status: done
     comment: validate_input probes /api/info and /status before creating the entry.
@@ -87,8 +89,10 @@ rules:
     status: done
     comment: The WebSocket logs one warning per outage; the coordinator logs once on failure and once on recovery.
   parallel-updates:
-    status: todo
-    comment: No platform sets PARALLEL_UPDATES.
+    status: done
+    comment: >-
+      0 for the read-only coordinator platforms (sensor, binary_sensor, event). 1 for platforms
+      that send commands, so the device gets them one at a time.
   reauthentication-flow:
     status: exempt
     comment: >-
