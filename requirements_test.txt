@@ -1,0 +1,7 @@
+# Test dependencies; needs Python 3.13.
+# pytest-homeassistant-custom-component 0.13.316 pins homeassistant==2026.2.3,
+# pytest==9.0.0, pytest-asyncio==1.3.0 and pytest-cov==7.0.0.
+pytest-homeassistant-custom-component==0.13.316
+# Integration requirement (manifest.json) and the ffmpeg dependency's requirement
+websockets==17.4
+ha-ffmpeg==3.2.2

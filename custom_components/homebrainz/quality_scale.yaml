@@ -21,8 +21,8 @@ rules:
       User and zeroconf steps exist, but zeroconf creates the entry without asking the user
       (needs a discovery_confirm step) and the host field has no data_description.
   config-flow-test-coverage:
-    status: todo
-    comment: No tests yet.
+    status: done
+    comment: tests/test_config_flow.py covers config_flow.py at 100%.
   dependency-transparency:
     status: todo
     comment: >-
@@ -96,7 +96,7 @@ rules:
       device credentials or tokens.
   test-coverage:
     status: todo
-    comment: Needs over 95% coverage across all modules.
+    comment: 93% overall; media_player.py (74%) is the main gap.
 
   # Gold
   devices:
