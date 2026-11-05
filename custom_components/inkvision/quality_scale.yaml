@@ -108,7 +108,8 @@ rules:
     status: done
     comment: One device per entry; identifiers fall back to the host when the MAC is missing, so prefer entry.unique_id.
   diagnostics:
-    status: todo
+    status: done
+    comment: Entry data and coordinator data, with host, MAC, IP, SSID and the OTA download URL redacted.
   discovery:
     status: done
     comment: Zeroconf (_homebrainz._tcp and name-matched _http._tcp services).

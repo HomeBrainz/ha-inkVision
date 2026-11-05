@@ -377,6 +377,11 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         return True
 
     @property
+    def websocket_connected(self) -> bool:
+        """True while the WebSocket to the device is open."""
+        return self._websocket_connected
+
+    @property
     def custom_screens_supported(self) -> bool:
         """True when the firmware reports custom rotation screen slots."""
         status = (self.data or {}).get("status", {}) or {}
