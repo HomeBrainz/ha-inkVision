@@ -1,4 +1,4 @@
-"""Button platform for HomeBrainz integration."""
+"""Button platform for inkVision integration."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,19 +28,19 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = [
-        HomeBrainzFirmwareCheckButton(coordinator, config_entry),
-        HomeBrainzFirmwareUpdateButton(coordinator, config_entry),
+        InkVisionFirmwareCheckButton(coordinator, config_entry),
+        InkVisionFirmwareUpdateButton(coordinator, config_entry),
     ]
 
     async_add_entities(entities)
 
 
-class HomeBrainzButtonEntity(CoordinatorEntity, ButtonEntity):
-    """Base class for HomeBrainz button entities."""
+class InkVisionButtonEntity(CoordinatorEntity, ButtonEntity):
+    """Base class for inkVision button entities."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -50,7 +50,7 @@ class HomeBrainzButtonEntity(CoordinatorEntity, ButtonEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -70,12 +70,12 @@ class HomeBrainzButtonEntity(CoordinatorEntity, ButtonEntity):
         )
 
 
-class HomeBrainzFirmwareCheckButton(HomeBrainzButtonEntity):
+class InkVisionFirmwareCheckButton(InkVisionButtonEntity):
     """Button to trigger firmware update check."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator, config_entry)
@@ -88,12 +88,12 @@ class HomeBrainzFirmwareCheckButton(HomeBrainzButtonEntity):
         await self.coordinator.async_update_ota_status()
 
 
-class HomeBrainzFirmwareUpdateButton(HomeBrainzButtonEntity):
+class InkVisionFirmwareUpdateButton(InkVisionButtonEntity):
     """Button to start firmware update."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator, config_entry)

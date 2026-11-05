@@ -1,4 +1,4 @@
-"""The HomeBrainz integration."""
+"""The inkVision integration."""
 from __future__ import annotations
 
 import asyncio
@@ -28,9 +28,12 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from . import legacy_migration
 from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -87,8 +90,8 @@ CUSTOM_SCREEN_SCHEMA = vol.Schema({
 })
 
 
-class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching data from the HomeBrainz device via WebSocket."""
+class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching data from the inkVision device via WebSocket."""
 
     def __init__(self, hass: HomeAssistant, host: str) -> None:
         """Initialize."""
@@ -163,9 +166,9 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
                     self._websocket = websocket
                     self._websocket_connected = True
                     if self._retry_count:
-                        _LOGGER.info("WebSocket reconnected to HomeBrainz device at %s", self.host)
+                        _LOGGER.info("WebSocket reconnected to inkVision device at %s", self.host)
                     else:
-                        _LOGGER.debug("WebSocket connected to HomeBrainz device at %s", self.host)
+                        _LOGGER.debug("WebSocket connected to inkVision device at %s", self.host)
                     self._retry_count = 0
                     
                     # Request initial data
@@ -644,9 +647,18 @@ class HomeBrainzDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed("Timeout communicating with API")
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the integration."""
+    await legacy_migration.async_setup_legacy(hass)  # legacy: HACS-only
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up HomeBrainz from a config entry."""
-    coordinator = HomeBrainzDataUpdateCoordinator(
+    """Set up inkVision from a config entry."""
+    if legacy_migration.CONF_MIGRATE_FROM in entry.data:  # legacy: HACS-only
+        await legacy_migration.async_take_over_legacy_entry(hass, entry)
+
+    coordinator = InkVisionDataUpdateCoordinator(
         hass, entry.data["host"]
     )
 
@@ -678,7 +690,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 @callback
 def _async_track_custom_screen_templates(
-    hass: HomeAssistant, entry: ConfigEntry, coordinator: HomeBrainzDataUpdateCoordinator
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: InkVisionDataUpdateCoordinator
 ) -> None:
     """Keep each templated custom screen slot in sync with its template's result."""
     for slot in range(1, CUSTOM_SCREEN_SLOTS + 1):
@@ -799,7 +811,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
-    """Set up services for HomeBrainz."""
+    """Set up services for inkVision."""
     
     async def set_brightness_service(call: ServiceCall) -> None:
         """Handle set brightness service call."""
@@ -889,18 +901,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         else:
             _LOGGER.error("Failed to set timezone for device %s", device_id)
     
-    hass.services.async_register(
-        DOMAIN, SERVICE_SET_BRIGHTNESS, set_brightness_service, schema=BRIGHTNESS_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DISPLAY_TEXT, display_text_service, schema=DISPLAY_TEXT_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_RESTART_DEVICE, restart_device_service, schema=RESTART_DEVICE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_SET_SCREEN_ROTATION, set_screen_rotation_service, schema=SCREEN_ROTATION_SCHEMA
-    )
     async def set_custom_screen_service(call: ServiceCall) -> None:
         """Handle set custom screen service call."""
         device_id = call.data["device_id"]
@@ -915,25 +915,31 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         await coordinator.async_set_custom_screen(slot, call.data["text"])
 
-    hass.services.async_register(
-        DOMAIN, SERVICE_SET_TIMEZONE, set_timezone_service, schema=TIMEZONE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_SET_CUSTOM_SCREEN, set_custom_screen_service, schema=CUSTOM_SCREEN_SCHEMA
-    )
+    services = {
+        SERVICE_SET_BRIGHTNESS: (set_brightness_service, BRIGHTNESS_SCHEMA),
+        SERVICE_DISPLAY_TEXT: (display_text_service, DISPLAY_TEXT_SCHEMA),
+        SERVICE_RESTART_DEVICE: (restart_device_service, RESTART_DEVICE_SCHEMA),
+        SERVICE_SET_SCREEN_ROTATION: (set_screen_rotation_service, SCREEN_ROTATION_SCHEMA),
+        SERVICE_SET_TIMEZONE: (set_timezone_service, TIMEZONE_SCHEMA),
+        SERVICE_SET_CUSTOM_SCREEN: (set_custom_screen_service, CUSTOM_SCREEN_SCHEMA),
+    }
+    for name, (handler, schema) in services.items():
+        hass.services.async_register(DOMAIN, name, handler, schema=schema)
+    legacy_migration.async_register_service_aliases(hass, services)  # legacy: HACS-only
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
-    """Unload services for HomeBrainz."""
+    """Unload services for inkVision."""
     hass.services.async_remove(DOMAIN, SERVICE_SET_BRIGHTNESS)
     hass.services.async_remove(DOMAIN, SERVICE_DISPLAY_TEXT)
     hass.services.async_remove(DOMAIN, SERVICE_RESTART_DEVICE)
     hass.services.async_remove(DOMAIN, SERVICE_SET_SCREEN_ROTATION)
     hass.services.async_remove(DOMAIN, SERVICE_SET_TIMEZONE)
     hass.services.async_remove(DOMAIN, SERVICE_SET_CUSTOM_SCREEN)
+    legacy_migration.async_remove_service_aliases(hass)  # legacy: HACS-only
 
 
-async def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> HomeBrainzDataUpdateCoordinator:
+async def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> InkVisionDataUpdateCoordinator:
     """Get coordinator for a specific device."""
     device_registry = dr.async_get(hass)
     device = device_registry.async_get(device_id)

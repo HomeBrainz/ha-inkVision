@@ -1,16 +1,16 @@
-# Services for HomeBrainz integration
+# Services for inkVision integration
 
 set_brightness:
   name: Set Display Brightness
-  description: Set the display brightness of the HomeBrainz device
+  description: Set the display brightness of the inkVision device
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to control
+      description: The inkVision device to control
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
     brightness:
       name: Brightness Level
       description: Brightness level (0-15, where 0 turns the display off and 15 is brightest)
@@ -23,15 +23,15 @@ set_brightness:
 
 display_text:
   name: Display Custom Text
-  description: Display custom text on the HomeBrainz device
+  description: Display custom text on the inkVision device
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to control
+      description: The inkVision device to control
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
     text:
       name: Text
       description: The text to display on the device
@@ -41,15 +41,15 @@ display_text:
 
 restart_device:
   name: Restart Device
-  description: Restart the HomeBrainz device
+  description: Restart the inkVision device
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to restart
+      description: The inkVision device to restart
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
 
 set_screen_rotation:
   name: Set Screen Rotation
@@ -57,11 +57,11 @@ set_screen_rotation:
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to control
+      description: The inkVision device to control
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
     screens:
       name: Screens
       description: The screens to include in rotation (order is fixed)
@@ -85,15 +85,15 @@ set_screen_rotation:
 
 set_timezone:
   name: Set Timezone
-  description: Set the timezone on the HomeBrainz device
+  description: Set the timezone on the inkVision device
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to control
+      description: The inkVision device to control
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
     timezone:
       name: Timezone
       description: IANA timezone name (e.g. Europe/Prague)
@@ -109,11 +109,11 @@ set_custom_screen:
   fields:
     device_id:
       name: Device
-      description: The HomeBrainz device to control
+      description: The inkVision device to control
       required: true
       selector:
         device:
-          integration: homebrainz
+          integration: inkvision
     slot:
       name: Slot
       description: Custom screen slot (1-4)

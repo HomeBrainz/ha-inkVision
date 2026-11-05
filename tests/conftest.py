@@ -1,4 +1,4 @@
-"""Fixtures for HomeBrainz integration tests."""
+"""Fixtures for inkVision integration tests."""
 from __future__ import annotations
 
 import asyncio
@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.homebrainz.const import DOMAIN
+from custom_components.inkvision.const import DOMAIN
 
 HOST = "192.168.1.50"
 BASE_URL = f"http://{HOST}"
@@ -85,14 +85,14 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
 def mock_setup_entry() -> Generator[AsyncMock]:
     """Skip the real entry setup when only the config flow is under test."""
     with patch(
-        "custom_components.homebrainz.async_setup_entry", return_value=True
+        "custom_components.inkvision.async_setup_entry", return_value=True
     ) as mock_setup:
         yield mock_setup
 
 
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
-    """Return a HomeBrainz config entry."""
+    """Return an inkVision config entry."""
     return MockConfigEntry(
         domain=DOMAIN,
         title="Atmos Smart Clock",
@@ -200,7 +200,7 @@ class FakeWebSocketFactory:
 def mock_websocket() -> Generator[FakeWebSocketFactory]:
     """Patch the integration's WebSocket client."""
     factory = FakeWebSocketFactory()
-    with patch("custom_components.homebrainz.websockets.connect", factory):
+    with patch("custom_components.inkvision.websockets.connect", factory):
         yield factory
 
 

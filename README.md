@@ -1,7 +1,7 @@
-# HomeBrainz Home Assistant Integration for inkVision(R)
+# inkVision(R) Home Assistant Integration
 
 <p align="center">
-  <img src="custom_components/homebrainz/icons/logo.svg" alt="HomeBrainz Logo" width="200">
+  <img src="custom_components/inkvision/icons/logo.svg" alt="inkVision logo" width="200">
 </p>
 
 [![GitHub Release][releases-shield]][releases]
@@ -31,27 +31,34 @@ Works with inkVision(R) devices running HomeBrainz firmware. Available entities 
 
 [![Open your Home Assistant instance and open this repository in HACS.][my-hacs-badge]][my-hacs]
 
-1. Click the button above, or open **HACS** in Home Assistant and search for **HomeBrainz**
+1. Click the button above, or open **HACS** in Home Assistant and search for **inkVision**
 2. Click **Download**
 3. Restart Home Assistant
 
 ### Manual installation
 
 1. Download the latest release from the [releases page][releases]
-2. Copy the `custom_components/homebrainz` folder into the `custom_components` folder of your Home Assistant configuration directory (create `custom_components` if it does not exist)
+2. Copy the `custom_components/inkvision` folder into the `custom_components` folder of your Home Assistant configuration directory (create `custom_components` if it does not exist)
 3. Restart Home Assistant
 
 ## Configuration
 
-[![Open your Home Assistant instance and start setting up HomeBrainz.][my-config-badge]][my-config]
+[![Open your Home Assistant instance and start setting up inkVision.][my-config-badge]][my-config]
 
 Devices on your network are usually discovered automatically and appear under **Settings** > **Devices & Services** as ready to configure. To add a device yourself:
 
 1. Go to **Settings** > **Devices & Services**
-2. Click **Add Integration** and search for **HomeBrainz**
+2. Click **Add Integration** and search for **inkVision**
 3. Enter the device's IP address or hostname
 
 You can find the device's IP address in your router's list of connected devices.
+
+### Upgrading from the HomeBrainz integration
+
+This integration used to be called HomeBrainz (`homebrainz`). After you update it in HACS and restart Home Assistant, your devices move to inkVision automatically. Entity IDs, history, dashboards and device IDs stay the same.
+
+- Actions were renamed from `homebrainz.*` to `inkvision.*`. The old names keep working; when an automation or script uses one, a notice under **Settings** > **Repairs** tells you which action to change.
+- HACS leaves the old `custom_components/homebrainz` folder behind. A repair notice offers to delete it; restart Home Assistant afterwards.
 
 ## Entities
 
@@ -70,12 +77,12 @@ Platform | Description
 
 ## Services
 
-- `homebrainz.set_brightness`: set the display brightness
-- `homebrainz.display_text`: show a custom text on the display
-- `homebrainz.restart_device`: restart the device
-- `homebrainz.set_screen_rotation`: choose which screens the display rotates through
-- `homebrainz.set_timezone`: set the device timezone
-- `homebrainz.set_custom_screen`: set the text of a custom screen (slot 1-4); empty text removes it
+- `inkvision.set_brightness`: set the display brightness
+- `inkvision.display_text`: show a custom text on the display
+- `inkvision.restart_device`: restart the device
+- `inkvision.set_screen_rotation`: choose which screens the display rotates through
+- `inkvision.set_timezone`: set the device timezone
+- `inkvision.set_custom_screen`: set the text of a custom screen (slot 1-4); empty text removes it
 
 All services take a target device and can be tried out under **Developer Tools** > **Actions**.
 
@@ -97,7 +104,7 @@ actions:
 
 ## Custom Screens
 
-The clock can show up to 4 custom screens in its rotation, after the regular screens. Set them under **Settings** > **Devices & services** > **HomeBrainz** > **Configure** as templates, for example `{{ states('sensor.outdoor_temperature') }}°C`. A screen updates whenever its template's result changes. Text longer than the display scrolls. Leave a field empty to remove that screen. You can also set screens from automations with `homebrainz.set_custom_screen`.
+The clock can show up to 4 custom screens in its rotation, after the regular screens. Set them under **Settings** > **Devices & services** > **inkVision** > **Configure** as templates, for example `{{ states('sensor.outdoor_temperature') }}°C`. A screen updates whenever its template's result changes. Text longer than the display scrolls. Leave a field empty to remove that screen. You can also set screens from automations with `inkvision.set_custom_screen`.
 
 The clock doesn't store custom screens. Home Assistant sends them again whenever it reconnects, and clears them when the integration is unloaded.
 
@@ -118,7 +125,7 @@ Each device has its own settings page. Open it from the device page in Home Assi
 
 1. Make sure the device firmware is up to date
 2. Check that the volume is not muted or set very low
-3. Check the Home Assistant logs for messages from the HomeBrainz integration
+3. Check the Home Assistant logs for messages from the inkVision integration
 
 ### Some sensors are missing
 
@@ -138,5 +145,5 @@ Found a bug or have a feature request? Please [open an issue][issues].
 [inkvision-site]: https://inkvision.eu
 [my-hacs]: https://my.home-assistant.io/redirect/hacs_repository/?owner=HomeBrainz&repository=ha-inkVision&category=integration
 [my-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
-[my-config]: https://my.home-assistant.io/redirect/config_flow_start/?domain=homebrainz
+[my-config]: https://my.home-assistant.io/redirect/config_flow_start/?domain=inkvision
 [my-config-badge]: https://my.home-assistant.io/badges/config_flow_start.svg

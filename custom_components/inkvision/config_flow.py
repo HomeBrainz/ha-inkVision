@@ -1,4 +1,4 @@
-"""Config flow for HomeBrainz integration."""
+"""Config flow for inkVision integration."""
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - fallback for older HA cores
     from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
 from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN
+from .legacy_migration import CONF_MIGRATE_FROM
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,8 +56,8 @@ def _decode_discovery_value(value: Any) -> str:
     return str(value or "")
 
 
-def _is_homebrainz_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
-    """Check whether the zeroconf service looks like a HomeBrainz device."""
+def _is_inkvision_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
+    """Check whether the zeroconf service looks like an inkVision device."""
     properties = getattr(discovery_info, "properties", {}) or {}
     discovery_name = _decode_discovery_value(getattr(discovery_info, "name", "")).lower()
     hostname = _decode_discovery_value(getattr(discovery_info, "hostname", "")).lower()
@@ -64,6 +65,8 @@ def _is_homebrainz_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
     service_type = _decode_discovery_value(getattr(discovery_info, "type", "")).lower()
     path = _decode_discovery_value(properties.get("path") or properties.get(b"path")).lower()
 
+    # "homebrainz"/"hbz" here and below are what the firmware advertises and
+    # reports, not the integration's name; they stay after the rename.
     if service_type == "_homebrainz._tcp.local.":
         return True
 
@@ -78,7 +81,7 @@ def _is_homebrainz_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
 
 
 def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
-    """Normalize device info returned by different HomeBrainz firmware APIs."""
+    """Normalize device info returned by different inkVision firmware APIs."""
     if not isinstance(payload, dict):
         return None
 
@@ -93,7 +96,7 @@ def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
         or payload.get("device_name")
         or payload.get("device")
         or payload.get("model")
-        or "HomeBrainz"
+        or "inkVision"
     )
 
     markers = (
@@ -112,16 +115,16 @@ def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
         "bento",
         "hbz",
     )
-    looks_like_homebrainz = any(
+    looks_like_inkvision = any(
         isinstance(marker, str)
         and any(candidate in marker.lower() for candidate in supported_markers)
         for marker in markers
     )
 
     if payload.get("type") == "HOMEBRAINZ_DEVICE":
-        looks_like_homebrainz = True
+        looks_like_inkvision = True
 
-    if not looks_like_homebrainz:
+    if not looks_like_inkvision:
         return None
 
     return {
@@ -140,7 +143,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     session = async_get_clientsession(hass)
 
     last_error: Exception | None = None
-    received_non_homebrainz_response = False
+    received_non_inkvision_response = False
 
     for endpoint in DISCOVERY_ENDPOINTS:
         try:
@@ -155,7 +158,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             if info is not None:
                 return info
 
-            received_non_homebrainz_response = True
+            received_non_inkvision_response = True
         except aiohttp.ClientError as err:
             last_error = err
         except (asyncio.TimeoutError, TimeoutError) as err:
@@ -166,7 +169,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             _LOGGER.debug("Unexpected validation error for %s%s: %s", host, endpoint, err)
             last_error = err
 
-    if received_non_homebrainz_response:
+    if received_non_inkvision_response:
         raise InvalidDevice
 
     if last_error is not None:
@@ -176,7 +179,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for HomeBrainz."""
+    """Handle a config flow for inkVision."""
 
     VERSION = 3
 
@@ -191,7 +194,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         discovery_info: ZeroconfServiceInfo,
     ) -> FlowResult:
         """Handle Zeroconf discovery."""
-        if not _is_homebrainz_discovery(discovery_info):
+        if not _is_inkvision_discovery(discovery_info):
             return self.async_abort(reason="invalid_device")
 
         host = discovery_info.host
@@ -216,6 +219,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title=info["title"],
             data={CONF_HOST: info["host"]},
         )
+
+    async def async_step_import(self, import_data: dict[str, Any]) -> FlowResult:
+        """Take over an entry of the pre-rename "homebrainz" domain (legacy: HACS-only)."""
+        old = self.hass.config_entries.async_get_entry(import_data[CONF_MIGRATE_FROM])
+        if old is None:
+            return self.async_abort(reason="legacy_entry_missing")
+
+        await self.async_set_unique_id(old.unique_id)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=old.title, data=import_data, options=dict(old.options))
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -286,4 +299,4 @@ class CannotConnect(HomeAssistantError):
 
 
 class InvalidDevice(HomeAssistantError):
-    """Error to indicate the device is not a valid HomeBrainz Clock device."""
+    """Error to indicate the device is not a valid inkVision device."""

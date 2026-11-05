@@ -1,4 +1,4 @@
-"""Switch platform for HomeBrainz integration."""
+"""Switch platform for inkVision integration."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = [
-        HomeBrainzScreenSwitch(
+        InkVisionScreenSwitch(
             coordinator,
             config_entry,
             screen_id=screen_id,
@@ -58,12 +58,12 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class HomeBrainzSwitchEntity(CoordinatorEntity, SwitchEntity):
-    """Base class for HomeBrainz switch entities."""
+class InkVisionSwitchEntity(CoordinatorEntity, SwitchEntity):
+    """Base class for inkVision switch entities."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -73,7 +73,7 @@ class HomeBrainzSwitchEntity(CoordinatorEntity, SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -93,12 +93,12 @@ class HomeBrainzSwitchEntity(CoordinatorEntity, SwitchEntity):
         )
 
 
-class HomeBrainzScreenSwitch(HomeBrainzSwitchEntity):
+class InkVisionScreenSwitch(InkVisionSwitchEntity):
     """Switch to enable/disable a screen in the rotation list."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
         *,
         screen_id: str,

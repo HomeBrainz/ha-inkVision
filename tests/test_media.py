@@ -1,4 +1,4 @@
-"""Tests for the HomeBrainz audio proxy and playlist resolver."""
+"""Tests for the inkVision audio proxy and playlist resolver."""
 from __future__ import annotations
 
 import asyncio
@@ -22,7 +22,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
-from custom_components.homebrainz.audio_proxy import (
+from custom_components.inkvision.audio_proxy import (
     DATA_AUDIO_PROXY,
     FORMAT_MP3,
     FORMAT_WAV,
@@ -30,8 +30,8 @@ from custom_components.homebrainz.audio_proxy import (
     AudioProxyData,
     _redact,
 )
-from custom_components.homebrainz.const import DOMAIN
-from custom_components.homebrainz.playlist import (
+from custom_components.inkvision.const import DOMAIN
+from custom_components.inkvision.playlist import (
     async_resolve_playlist,
     looks_like_playlist_url,
     parse_playlist,
@@ -221,7 +221,7 @@ async def test_play_media_through_proxy(
 
     process = _FakeProcess(b"RIFF....WAVEdata", b"Connection refused\n", 1)
     with patch(
-        "custom_components.homebrainz.audio_proxy.asyncio.create_subprocess_exec",
+        "custom_components.inkvision.audio_proxy.asyncio.create_subprocess_exec",
         return_value=process,
     ) as mock_exec:
         response = await client.get(path)
@@ -253,7 +253,7 @@ async def test_play_media_without_internal_url(
     aioclient_mock.post(f"{BASE_URL}/speaker/play", json={})
 
     with patch(
-        "custom_components.homebrainz.media_player.get_url", side_effect=Exception("no url")
+        "custom_components.inkvision.media_player.get_url", side_effect=Exception("no url")
     ):
         await _play_remote_stream(hass, init_integration)
 

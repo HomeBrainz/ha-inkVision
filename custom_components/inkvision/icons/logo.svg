@@ -1,0 +1,6 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- The Hardware Body (Obsidian/Slate) -->
+  <path d="M60 50 L100 90 L140 50 L160 70 L100 130 L40 70 Z" fill="#1E293B" />
+  <!-- The Software 'Ink' (Red Brass) -->
+  <path d="M100 155 L120 135 H80 Z" fill="#B45309" />
+</svg>

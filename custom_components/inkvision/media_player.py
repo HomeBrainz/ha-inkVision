@@ -1,4 +1,4 @@
-"""Media player platform for HomeBrainz integration."""
+"""Media player platform for inkVision integration."""
 from __future__ import annotations
 
 import ipaddress
@@ -20,7 +20,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .audio_proxy import FORMAT_MP3, FORMAT_WAV, async_setup_audio_proxy
 from .const import DOMAIN, MANUFACTURER, MODEL
 from .playlist import async_resolve_playlist
@@ -60,18 +60,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up the media_player platform."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([HomeBrainzSpeakerEntity(coordinator, config_entry)])
+    async_add_entities([InkVisionSpeakerEntity(coordinator, config_entry)])
 
 
-class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
-    """HomeBrainz speaker exposed as a Home Assistant media player."""
+class InkVisionSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
+    """inkVision speaker exposed as a Home Assistant media player."""
 
     _attr_name = "Speaker"
     _attr_supported_features = SPEAKER_FEATURES
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the media player entity."""
@@ -90,7 +90,7 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -373,5 +373,5 @@ class HomeBrainzSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
 
             return await media_source.async_browse_media(self.hass, media_content_id)
         except Exception as err:
-            _LOGGER.error("Failed to browse media for HomeBrainz speaker: %s", err)
+            _LOGGER.error("Failed to browse media for inkVision speaker: %s", err)
             raise

@@ -1,4 +1,4 @@
-"""Sensor platform for HomeBrainz integration."""
+"""Sensor platform for inkVision integration."""
 from __future__ import annotations
 
 import logging
@@ -24,7 +24,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,11 +39,11 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = [
-        HomeBrainzTemperatureSensor(coordinator, config_entry),
-        HomeBrainzHumiditySensor(coordinator, config_entry),
-        HomeBrainzPressureSensor(coordinator, config_entry),
-        HomeBrainzWiFiSignalSensor(coordinator, config_entry),
-        HomeBrainzGenericSensor(
+        InkVisionTemperatureSensor(coordinator, config_entry),
+        InkVisionHumiditySensor(coordinator, config_entry),
+        InkVisionPressureSensor(coordinator, config_entry),
+        InkVisionWiFiSignalSensor(coordinator, config_entry),
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Gas Resistance",
@@ -53,7 +53,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=1,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Device Uptime",
@@ -64,7 +64,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Display Brightness",
@@ -73,7 +73,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="IP Address",
@@ -81,7 +81,7 @@ async def async_setup_entry(
             value_fn=lambda entity: entity.get_status_value("ip_address"),
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="MAC Address",
@@ -89,7 +89,7 @@ async def async_setup_entry(
             value_fn=lambda entity: entity.get_status_value("mac_address"),
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Firmware Version",
@@ -97,7 +97,7 @@ async def async_setup_entry(
             value_fn=lambda entity: entity.get_status_value("version"),
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Firmware ID",
@@ -105,7 +105,7 @@ async def async_setup_entry(
             value_fn=lambda entity: entity.get_ota_value("currentFirmwareId"),
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Latest Firmware ID",
@@ -113,7 +113,7 @@ async def async_setup_entry(
             value_fn=lambda entity: entity.get_ota_value("latestFirmwareId"),
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Latest Firmware Version",
@@ -122,7 +122,7 @@ async def async_setup_entry(
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
         # ── BSEC Air Quality sensors ──
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Indoor Air Quality",
@@ -133,7 +133,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="IAQ Accuracy",
@@ -142,7 +142,7 @@ async def async_setup_entry(
             icon="mdi:tune-vertical",
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Static IAQ",
@@ -153,7 +153,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="CO₂ Equivalent",
@@ -164,7 +164,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="Breath VOC",
@@ -175,7 +175,7 @@ async def async_setup_entry(
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=1,
         ),
-        HomeBrainzGenericSensor(
+        InkVisionGenericSensor(
             coordinator,
             config_entry,
             name="IAQ Rating",
@@ -188,12 +188,12 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class HomeBrainzSensorEntity(CoordinatorEntity, SensorEntity):
-    """Base class for HomeBrainz sensor entities."""
+class InkVisionSensorEntity(CoordinatorEntity, SensorEntity):
+    """Base class for inkVision sensor entities."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""
@@ -204,7 +204,7 @@ class HomeBrainzSensorEntity(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -257,24 +257,24 @@ class HomeBrainzSensorEntity(CoordinatorEntity, SensorEntity):
         return ota.get(key, default)
 
 
-class HomeBrainzGenericSensor(HomeBrainzSensorEntity):
+class InkVisionGenericSensor(InkVisionSensorEntity):
     """Generic sensor driven by simple extractor callbacks."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
         *,
         name: str,
         unique_id_suffix: str,
-        value_fn: Callable[[HomeBrainzSensorEntity], Any],
+        value_fn: Callable[[InkVisionSensorEntity], Any],
         device_class: SensorDeviceClass | None = None,
         native_unit_of_measurement: str | UnitOfTemperature | UnitOfPressure | None = None,
         state_class: SensorStateClass | None = None,
         entity_category: EntityCategory | None = None,
         icon: str | None = None,
         suggested_display_precision: int | None = None,
-        extra_attributes_fn: Callable[[HomeBrainzSensorEntity], dict[str, Any] | None] | None = None,
+        extra_attributes_fn: Callable[[InkVisionSensorEntity], dict[str, Any] | None] | None = None,
     ) -> None:
         super().__init__(coordinator, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_{unique_id_suffix}"
@@ -301,7 +301,7 @@ class HomeBrainzGenericSensor(HomeBrainzSensorEntity):
         try:
             value = self._value_fn(self)
         except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("HomeBrainz sensor '%s' failed to compute value", self._attr_name)
+            _LOGGER.exception("inkVision sensor '%s' failed to compute value", self._attr_name)
             return None
         return value
 
@@ -312,17 +312,17 @@ class HomeBrainzGenericSensor(HomeBrainzSensorEntity):
         try:
             attrs = self._extra_attributes_fn(self)
         except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("HomeBrainz sensor '%s' failed to compute attributes", self._attr_name)
+            _LOGGER.exception("inkVision sensor '%s' failed to compute attributes", self._attr_name)
             return None
         return attrs
 
 
-class HomeBrainzTemperatureSensor(HomeBrainzSensorEntity):
+class InkVisionTemperatureSensor(InkVisionSensorEntity):
     """Temperature sensor."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""
@@ -353,12 +353,12 @@ class HomeBrainzTemperatureSensor(HomeBrainzSensorEntity):
         return None
 
 
-class HomeBrainzHumiditySensor(HomeBrainzSensorEntity):
+class InkVisionHumiditySensor(InkVisionSensorEntity):
     """Humidity sensor."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""
@@ -380,12 +380,12 @@ class HomeBrainzHumiditySensor(HomeBrainzSensorEntity):
         return self.get_sensor_value("aht20", "humidity")
 
 
-class HomeBrainzPressureSensor(HomeBrainzSensorEntity):
+class InkVisionPressureSensor(InkVisionSensorEntity):
     """Pressure sensor."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""
@@ -407,12 +407,12 @@ class HomeBrainzPressureSensor(HomeBrainzSensorEntity):
         return self.get_sensor_value("bmp280", "pressure")
 
 
-class HomeBrainzWiFiSignalSensor(HomeBrainzSensorEntity):
+class InkVisionWiFiSignalSensor(InkVisionSensorEntity):
     """WiFi Signal sensor."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize the sensor."""

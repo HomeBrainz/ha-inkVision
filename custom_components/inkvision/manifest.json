@@ -1,15 +1,24 @@
 {
-  "domain": "homebrainz",
-  "name": "HomeBrainz",
-  "codeowners": ["@11ado33"],
+  "domain": "inkvision",
+  "name": "inkVision",
+  "codeowners": [
+    "@11ado33"
+  ],
   "config_flow": true,
-  "dependencies": ["ffmpeg", "http"],
+  "dependencies": [
+    "ffmpeg",
+    "http"
+  ],
   "documentation": "https://github.com/HomeBrainz/ha-inkVision",
   "homekit": {},
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/HomeBrainz/ha-inkVision/issues",
-  "loggers": ["custom_components.homebrainz"],
-  "requirements": ["websockets>=11.0"],
+  "loggers": [
+    "custom_components.inkvision"
+  ],
+  "requirements": [
+    "websockets>=11.0"
+  ],
   "ssdp": [],
   "version": "1.0.19",
   "zeroconf": [

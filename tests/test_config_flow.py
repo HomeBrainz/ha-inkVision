@@ -1,4 +1,4 @@
-"""Tests for the HomeBrainz config flow."""
+"""Tests for the inkVision config flow."""
 from __future__ import annotations
 
 import asyncio
@@ -17,12 +17,12 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.homebrainz.config_flow import (
+from custom_components.inkvision.config_flow import (
     _decode_discovery_value,
     _extract_device_info,
     normalize_host,
 )
-from custom_components.homebrainz.const import DOMAIN
+from custom_components.inkvision.const import DOMAIN
 
 from .conftest import BASE_URL, HOST, INFO_PAYLOAD, MAC
 
@@ -175,7 +175,7 @@ async def test_user_flow_errors(
 async def test_user_flow_non_homebrainz_wins_over_connection_error(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Test a reachable non-HomeBrainz device reports invalid_device, not cannot_connect."""
+    """Test a reachable non-inkVision device reports invalid_device, not cannot_connect."""
     aioclient_mock.get(f"{BASE_URL}/api/info", json={"device": "Shelly Plug"})
     aioclient_mock.get(f"{BASE_URL}/status", exc=aiohttp.ClientError())
     flow_id = await _start_user_flow(hass)
@@ -191,7 +191,7 @@ async def test_user_flow_unknown_error(hass: HomeAssistant) -> None:
     flow_id = await _start_user_flow(hass)
 
     with patch(
-        "custom_components.homebrainz.config_flow.validate_input",
+        "custom_components.inkvision.config_flow.validate_input",
         side_effect=RuntimeError("boom"),
     ):
         result = await hass.config_entries.flow.async_configure(flow_id, {CONF_HOST: HOST})
@@ -438,8 +438,8 @@ def test_normalize_host() -> None:
         ({"name": "My Atmos"}, "My Atmos"),
         ({"device_name": "Bento"}, "Bento"),
         ({"model": "HBZ-1"}, "HBZ-1"),
-        ({"device_type": "inkvision", "mac": MAC}, "HomeBrainz"),
-        ({"type": "HOMEBRAINZ_DEVICE"}, "HomeBrainz"),
+        ({"device_type": "inkvision", "mac": MAC}, "inkVision"),
+        ({"type": "HOMEBRAINZ_DEVICE"}, "inkVision"),
     ],
 )
 def test_extract_device_info_markers(payload: dict[str, Any], title: str) -> None:
@@ -452,11 +452,11 @@ def test_extract_device_info_markers(payload: dict[str, Any], title: str) -> Non
 
 @pytest.mark.xfail(
     reason=(
-        "Bug: _extract_device_info includes the fallback title 'HomeBrainz' in its "
+        "Bug: _extract_device_info includes the fallback title 'inkVision' in its "
         "markers, so any JSON object without name/device/model keys is accepted"
     ),
     strict=True,
 )
 def test_extract_device_info_rejects_unmarked_payload() -> None:
-    """Test a JSON object with no HomeBrainz markers is not identified as one."""
+    """Test a JSON object with no inkVision markers is not identified as one."""
     assert _extract_device_info({"status": "ok", "uptime": 12}, HOST) is None

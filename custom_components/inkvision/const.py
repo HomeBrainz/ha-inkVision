@@ -1,10 +1,12 @@
-"""Constants for the HomeBrainz integration."""
+"""Constants for the inkVision integration."""
 
-DOMAIN = "homebrainz"
+DOMAIN = "inkvision"
+# Domain of the integration before the rename; see legacy_migration.py.
+LEGACY_DOMAIN = "homebrainz"
 
 # Device info
-MANUFACTURER = "HomeBrainz"
-MODEL = "HomeBrainz Clock"
+MANUFACTURER = "inkVision"
+MODEL = "inkVision"
 
 # Default values
 DEFAULT_PORT = 80

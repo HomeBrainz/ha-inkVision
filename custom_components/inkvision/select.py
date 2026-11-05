@@ -1,4 +1,4 @@
-"""Select platform for HomeBrainz integration."""
+"""Select platform for inkVision integration."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -12,7 +12,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,17 +88,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up the select platform."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    entities: list[SelectEntity] = [HomeBrainzTimezoneSelect(coordinator, config_entry)]
+    entities: list[SelectEntity] = [InkVisionTimezoneSelect(coordinator, config_entry)]
     if coordinator.button_actions:
         entities.extend(
-            HomeBrainzButtonActionSelect(coordinator, config_entry, button, gesture)
+            InkVisionButtonActionSelect(coordinator, config_entry, button, gesture)
             for button in ("button1", "button2")
             for gesture in ("singleTap", "longPress")
         )
     async_add_entities(entities)
 
 
-class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
+class InkVisionTimezoneSelect(CoordinatorEntity, SelectEntity):
     """Select entity for device timezone."""
 
     _attr_name = "Timezone"
@@ -107,7 +107,7 @@ class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -118,7 +118,7 @@ class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -157,7 +157,7 @@ class HomeBrainzTimezoneSelect(CoordinatorEntity, SelectEntity):
 
         success = await self.coordinator.async_set_timezone(option)
         if not success:
-            raise HomeAssistantError("Unable to set timezone on HomeBrainz device.")
+            raise HomeAssistantError("Unable to set timezone on inkVision device.")
 
 
 # HA option -> firmware action name. Options are snake_case for translations.
@@ -172,7 +172,7 @@ BUTTON_ACTIONS = {
 GESTURE_NAMES = {"singleTap": "tap", "longPress": "long press"}
 
 
-class HomeBrainzButtonActionSelect(CoordinatorEntity, SelectEntity):
+class InkVisionButtonActionSelect(CoordinatorEntity, SelectEntity):
     """What one button gesture does on the device itself.
 
     "none" leaves the gesture to Home Assistant automations (event entities).
@@ -185,7 +185,7 @@ class HomeBrainzButtonActionSelect(CoordinatorEntity, SelectEntity):
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
         button: str,
         gesture: str,
@@ -205,7 +205,7 @@ class HomeBrainzButtonActionSelect(CoordinatorEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -242,4 +242,4 @@ class HomeBrainzButtonActionSelect(CoordinatorEntity, SelectEntity):
             self._button, self._gesture, BUTTON_ACTIONS[option]
         )
         if not success:
-            raise HomeAssistantError("Unable to set the button action on HomeBrainz device.")
+            raise HomeAssistantError("Unable to set the button action on inkVision device.")

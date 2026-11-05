@@ -1,4 +1,4 @@
-"""Smoke tests for the HomeBrainz entity platforms."""
+"""Smoke tests for the inkVision entity platforms."""
 from __future__ import annotations
 
 import aiohttp
@@ -44,7 +44,7 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.homebrainz.const import DOMAIN
+from custom_components.inkvision.const import DOMAIN
 
 from .conftest import BASE_URL, HOST, FakeWebSocketFactory
 

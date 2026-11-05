@@ -1,4 +1,4 @@
-"""Event platform for HomeBrainz integration (physical button gestures)."""
+"""Event platform for inkVision integration (physical button gestures)."""
 from __future__ import annotations
 
 import logging
@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,12 +42,12 @@ async def async_setup_entry(
         return
 
     async_add_entities(
-        HomeBrainzButtonEvent(coordinator, config_entry, button)
+        InkVisionButtonEvent(coordinator, config_entry, button)
         for button in range(1, BUTTON_COUNT + 1)
     )
 
 
-class HomeBrainzButtonEvent(CoordinatorEntity, EventEntity):
+class InkVisionButtonEvent(CoordinatorEntity, EventEntity):
     """Fires on a single tap or long press of one of the device's buttons.
 
     Gestures fire whatever the button's on-device action is; set the action to
@@ -60,7 +60,7 @@ class HomeBrainzButtonEvent(CoordinatorEntity, EventEntity):
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
         button: int,
     ) -> None:
@@ -82,7 +82,7 @@ class HomeBrainzButtonEvent(CoordinatorEntity, EventEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}

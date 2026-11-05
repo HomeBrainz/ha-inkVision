@@ -32,7 +32,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-PROXY_URL_PREFIX: Final = "/api/homebrainz/audio_proxy"
+PROXY_URL_PREFIX: Final = "/api/inkvision/audio_proxy"
 
 # 22.05 kHz mono matches Piper's native rate and keeps the device-side stream
 # at ~44 KB/s, while the firmware's I2S DMA still holds ~370 ms of audio.
@@ -110,7 +110,7 @@ class AudioProxyView(HomeAssistantView):
     # The device cannot authenticate; access is gated by the unguessable id.
     requires_auth = False
     url = PROXY_URL_PREFIX + "/{device_id}/{filename}"
-    name = "api:homebrainz:audio_proxy"
+    name = "api:inkvision:audio_proxy"
 
     def __init__(self, hass: HomeAssistant, proxy_data: AudioProxyData) -> None:
         self.hass = hass
@@ -167,7 +167,7 @@ class AudioProxyView(HomeAssistantView):
 
         stderr_lines: deque[str] = deque(maxlen=_MAX_STDERR_LINES)
         stderr_task = self.hass.async_create_background_task(
-            _collect_stderr(proc, stderr_lines), "homebrainz audio proxy stderr"
+            _collect_stderr(proc, stderr_lines), "inkvision audio proxy stderr"
         )
 
         assert proc.stdout is not None

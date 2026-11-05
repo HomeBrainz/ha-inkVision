@@ -1,4 +1,4 @@
-"""Binary sensor platform for HomeBrainz integration."""
+"""Binary sensor platform for inkVision integration."""
 from __future__ import annotations
 
 import logging
@@ -14,7 +14,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,18 +29,18 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = [
-        HomeBrainzFirmwareUpdateAvailableSensor(coordinator, config_entry),
+        InkVisionFirmwareUpdateAvailableSensor(coordinator, config_entry),
     ]
 
     async_add_entities(entities)
 
 
-class HomeBrainzBinarySensor(CoordinatorEntity, BinarySensorEntity):
-    """Base class for HomeBrainz binary sensors."""
+class InkVisionBinarySensor(CoordinatorEntity, BinarySensorEntity):
+    """Base class for inkVision binary sensors."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -50,7 +50,7 @@ class HomeBrainzBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -70,12 +70,12 @@ class HomeBrainzBinarySensor(CoordinatorEntity, BinarySensorEntity):
         )
 
 
-class HomeBrainzFirmwareUpdateAvailableSensor(HomeBrainzBinarySensor):
+class InkVisionFirmwareUpdateAvailableSensor(InkVisionBinarySensor):
     """Binary sensor for firmware update availability."""
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator, config_entry)

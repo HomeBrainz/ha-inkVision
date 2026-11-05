@@ -1,4 +1,4 @@
-"""Number platform for HomeBrainz integration."""
+"""Number platform for inkVision integration."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -12,7 +12,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,10 +25,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the number platform."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([HomeBrainzBrightnessNumber(coordinator, config_entry)])
+    async_add_entities([InkVisionBrightnessNumber(coordinator, config_entry)])
 
 
-class HomeBrainzBrightnessNumber(CoordinatorEntity, NumberEntity):
+class InkVisionBrightnessNumber(CoordinatorEntity, NumberEntity):
     """Number entity to control display brightness."""
 
     _attr_name = "Display Brightness"
@@ -40,7 +40,7 @@ class HomeBrainzBrightnessNumber(CoordinatorEntity, NumberEntity):
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -51,7 +51,7 @@ class HomeBrainzBrightnessNumber(CoordinatorEntity, NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -92,7 +92,7 @@ class HomeBrainzBrightnessNumber(CoordinatorEntity, NumberEntity):
         brightness = max(self._attr_native_min_value, min(self._attr_native_max_value, int(round(value))))
 
         if not await self.coordinator.send_device_command("set_brightness", value=brightness):
-            raise HomeAssistantError("Unable to send brightness command to HomeBrainz device.")
+            raise HomeAssistantError("Unable to send brightness command to inkVision device.")
 
         existing = self.coordinator.data or {"sensors": {}, "status": {}}
         new_data = deepcopy(existing)

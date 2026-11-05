@@ -1,4 +1,4 @@
-"""Text platform for HomeBrainz integration."""
+"""Text platform for inkVision integration."""
 from __future__ import annotations
 
 import logging
@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import HomeBrainzDataUpdateCoordinator
+from . import InkVisionDataUpdateCoordinator
 from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,10 +31,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the text platform."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([HomeBrainzCustomTextEntity(coordinator, config_entry)])
+    async_add_entities([InkVisionCustomTextEntity(coordinator, config_entry)])
 
 
-class HomeBrainzCustomTextEntity(CoordinatorEntity, TextEntity):
+class InkVisionCustomTextEntity(CoordinatorEntity, TextEntity):
     """Text entity that shows a custom message on the device's display."""
 
     _attr_name = "Custom Message"
@@ -44,7 +44,7 @@ class HomeBrainzCustomTextEntity(CoordinatorEntity, TextEntity):
 
     def __init__(
         self,
-        coordinator: HomeBrainzDataUpdateCoordinator,
+        coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
@@ -71,7 +71,7 @@ class HomeBrainzCustomTextEntity(CoordinatorEntity, TextEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "HomeBrainz Clock"
+        device_name = "inkVision"
         mac_address = ""
 
         status = {}
@@ -94,7 +94,7 @@ class HomeBrainzCustomTextEntity(CoordinatorEntity, TextEntity):
         """Show the message on the device's display (auto-reverts on its own after a timeout)."""
         success = await self.coordinator.send_device_command("display_text", text=value)
         if not success:
-            raise HomeAssistantError("Unable to display text on HomeBrainz device.")
+            raise HomeAssistantError("Unable to display text on inkVision device.")
 
         self._attr_native_value = value[:CUSTOM_TEXT_MAX_LEN]
         self.async_write_ha_state()

@@ -1,4 +1,4 @@
-"""Tests for HomeBrainz setup, unload, services and the WebSocket coordinator."""
+"""Tests for inkVision setup, unload, services and the WebSocket coordinator."""
 from __future__ import annotations
 
 import asyncio
@@ -17,8 +17,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from websockets.exceptions import ConnectionClosedError
 
-from custom_components.homebrainz import HomeBrainzDataUpdateCoordinator
-from custom_components.homebrainz.const import DOMAIN
+from custom_components.inkvision import InkVisionDataUpdateCoordinator
+from custom_components.inkvision.const import DOMAIN
 
 from .conftest import (
     BASE_URL,
@@ -39,7 +39,7 @@ SERVICES = {
 }
 
 
-def _coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> HomeBrainzDataUpdateCoordinator:
+def _coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> InkVisionDataUpdateCoordinator:
     return hass.data[DOMAIN][entry.entry_id]
 
 
@@ -219,7 +219,7 @@ async def test_migrate_entry_removes_deprecated_entities(hass: HomeAssistant) ->
     free_heap = register("sensor", f"{entry.entry_id}_free_heap")
     temperature = register("sensor", f"{entry.entry_id}_temperature")
 
-    with patch("custom_components.homebrainz.async_setup_entry", return_value=True):
+    with patch("custom_components.inkvision.async_setup_entry", return_value=True):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
@@ -234,7 +234,7 @@ async def test_migrate_entry_noop_without_deprecated_entities(hass: HomeAssistan
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=MAC, version=1)
     entry.add_to_hass(hass)
 
-    with patch("custom_components.homebrainz.async_setup_entry", return_value=True):
+    with patch("custom_components.inkvision.async_setup_entry", return_value=True):
         assert await hass.config_entries.async_setup(entry.entry_id)
 
     assert entry.version == 3
@@ -358,7 +358,7 @@ async def test_websocket_reconnects(
     mock_websocket.connected.clear()
     mock_websocket.side_effects.append(OSError("unreachable"))
 
-    with patch("custom_components.homebrainz.WEBSOCKET_RETRY_DELAY", 0):
+    with patch("custom_components.inkvision.WEBSOCKET_RETRY_DELAY", 0):
         await first.messages.put(ConnectionClosedError(None, None))
         second = await mock_websocket.wait_listening()
         await hass.async_block_till_done()
@@ -381,7 +381,7 @@ async def test_websocket_unexpected_error_retries(
     first = mock_websocket.current
     mock_websocket.connected.clear()
 
-    with patch("custom_components.homebrainz.WEBSOCKET_RETRY_DELAY", 0):
+    with patch("custom_components.inkvision.WEBSOCKET_RETRY_DELAY", 0):
         await first.messages.put(RuntimeError("boom"))
         second = await mock_websocket.wait_listening()
 

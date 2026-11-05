@@ -1,1 +1,1 @@
-"""Tests for the HomeBrainz integration."""
+"""Tests for the inkVision integration."""
