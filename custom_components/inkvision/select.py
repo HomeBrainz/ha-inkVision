@@ -7,9 +7,10 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
 from .entity import InkVisionEntity
 
@@ -131,11 +132,15 @@ class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set the timezone on the device."""
         if option not in SUPPORTED_TIMEZONES:
-            raise HomeAssistantError(f"Unsupported timezone: {option}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unsupported_timezone",
+                translation_placeholders={"timezone": option},
+            )
 
         success = await self.coordinator.async_set_timezone(option)
         if not success:
-            raise HomeAssistantError("Unable to set timezone on inkVision device.")
+            raise self.coordinator.error("request_failed")
 
 
 # HA option -> firmware action name. Options are snake_case for translations.
@@ -192,10 +197,14 @@ class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set the gesture's action on the device."""
         if option not in BUTTON_ACTIONS:
-            raise HomeAssistantError(f"Unsupported button action: {option}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unsupported_button_action",
+                translation_placeholders={"action": option},
+            )
 
         success = await self.coordinator.async_set_button_action(
             self._button, self._gesture, BUTTON_ACTIONS[option]
         )
         if not success:
-            raise HomeAssistantError("Unable to set the button action on inkVision device.")
+            raise self.coordinator.error("request_failed")

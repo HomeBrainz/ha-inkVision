@@ -10,8 +10,10 @@ import aiohttp
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
 from .entity import InkVisionEntity
 
@@ -119,8 +121,7 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
         new_screens = [screen for screen in DEFAULT_SCREEN_ORDER if screen in current]
 
         if not new_screens:
-            _LOGGER.warning("At least one screen must remain enabled")
-            return
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="last_screen")
 
         if new_screens == self._get_enabled_screens():
             return
@@ -132,15 +133,9 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
                     json={"screens": new_screens},
                 ) as response:
                     if response.status != 200:
-                        _LOGGER.error(
-                            "Failed to update screen rotation for %s: %s",
-                            self._screen_id,
-                            response.status,
-                        )
-                        return
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            _LOGGER.error("HTTP error updating screen rotation", exc_info=True)
-            return
+                        raise self.coordinator.error("device_rejected", status=str(response.status))
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise self.coordinator.error("communication_error", error=str(err) or "timeout") from err
 
         existing = self.coordinator.data or {"sensors": {}, "status": {}, "screens": []}
         new_data = deepcopy(existing)

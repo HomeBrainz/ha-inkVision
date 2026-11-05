@@ -70,10 +70,10 @@ rules:
 
   # Silver
   action-exceptions:
-    status: todo
+    status: done
     comment: >-
-      Most services log an error and return when the device is missing or the command fails;
-      they should raise ServiceValidationError / HomeAssistantError.
+      Actions and entity commands raise ServiceValidationError for invalid input and
+      HomeAssistantError when the device is offline or rejects the command.
   config-entry-unloading:
     status: done
   docs-configuration-parameters:
@@ -145,8 +145,11 @@ rules:
     status: todo
     comment: Only the button action select uses a translation_key.
   exception-translations:
-    status: todo
-    comment: Exceptions use hard-coded English messages; strings.json has no exceptions section.
+    status: done
+    comment: >-
+      Every raised exception, including UpdateFailed, uses a translation key from the exceptions
+      section. The audio proxy view has requires_auth = False like core's ESPHome FFmpeg proxy:
+      the device can't authenticate, so each URL carries a random 128-bit ID instead.
   icon-translations:
     status: todo
     comment: Icons are set with _attr_icon and in sensor descriptions; move them to icons.json.

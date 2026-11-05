@@ -471,25 +471,22 @@ async def test_service_set_brightness_display_text_restart(
 async def test_services_when_websocket_down(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test WebSocket-backed services log an error when the device is offline."""
+    """Test WebSocket-backed services raise when the device is offline."""
     device_id = _device_id(hass)
     _coordinator(hass, init_integration)._websocket_connected = False
 
-    await hass.services.async_call(
-        DOMAIN, "set_brightness", {"device_id": device_id, "brightness": 7}, blocking=True
-    )
-    await hass.services.async_call(
-        DOMAIN, "display_text", {"device_id": device_id, "text": "Hello"}, blocking=True
-    )
-    await hass.services.async_call(
-        DOMAIN, "restart_device", {"device_id": device_id}, blocking=True
-    )
-
-    assert "Failed to set brightness" in caplog.text
-    assert "Failed to display text" in caplog.text
-    assert "Failed to restart device" in caplog.text
+    for service, data in (
+        ("set_brightness", {"brightness": 7}),
+        ("display_text", {"text": "Hello"}),
+        ("restart_device", {}),
+    ):
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                DOMAIN, service, {"device_id": device_id, **data}, blocking=True
+            )
+        assert err.value.translation_key == "not_connected"
+        assert err.value.translation_placeholders == {"device": init_integration.title}
 
 
 async def test_services_unknown_device(
@@ -538,25 +535,27 @@ async def test_service_set_screen_rotation(
     )
     assert aioclient_mock.mock_calls[-1][2] == {"screens": ["clock", "iaq"]}
 
-    await hass.services.async_call(
-        DOMAIN, "set_screen_rotation", {"device_id": device_id, "screens": []}, blocking=True
-    )
-    assert "No screens provided" in caplog.text
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN, "set_screen_rotation", {"device_id": device_id, "screens": []}, blocking=True
+        )
+    assert err.value.translation_key == "no_screens"
 
-    for mock_kwargs, message in (
-        ({"status": 500}, "Failed to update screen rotation"),
-        ({"exc": aiohttp.ClientError()}, "HTTP error updating screen rotation"),
-        ({"exc": asyncio.TimeoutError()}, "Timeout updating screen rotation"),
+    for mock_kwargs, key in (
+        ({"status": 500}, "device_rejected"),
+        ({"exc": aiohttp.ClientError()}, "communication_error"),
+        ({"exc": asyncio.TimeoutError()}, "communication_error"),
     ):
         aioclient_mock.clear_requests()
         aioclient_mock.post(url, **mock_kwargs)
-        await hass.services.async_call(
-            DOMAIN,
-            "set_screen_rotation",
-            {"device_id": device_id, "screens": ["clock"]},
-            blocking=True,
-        )
-        assert message in caplog.text
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "set_screen_rotation",
+                {"device_id": device_id, "screens": ["clock"]},
+                blocking=True,
+            )
+        assert err.value.translation_key == key
 
 
 async def test_service_set_timezone(
@@ -582,11 +581,12 @@ async def test_service_set_timezone(
     ):
         aioclient_mock.clear_requests()
         aioclient_mock.post(f"{BASE_URL}/config", **mock_kwargs)
-        await hass.services.async_call(
-            DOMAIN, "set_timezone", {"device_id": device_id, "timezone": "Etc/UTC"}, blocking=True
-        )
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                DOMAIN, "set_timezone", {"device_id": device_id, "timezone": "Etc/UTC"}, blocking=True
+            )
+        assert err.value.translation_key == "request_failed"
         assert message in caplog.text
-        assert "Failed to set timezone for device" in caplog.text
 
 
 async def test_service_set_custom_screen(

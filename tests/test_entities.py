@@ -39,7 +39,7 @@ from homeassistant.const import (
     STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -206,18 +206,25 @@ async def test_screen_switches(
     )
     calls = aioclient_mock.call_count
     # The last enabled screen can't be turned off.
-    await hass.services.async_call(
-        "switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: clock}, blocking=True
-    )
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            "switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: clock}, blocking=True
+        )
+    assert err.value.translation_key == "last_screen"
     assert aioclient_mock.call_count == calls
     assert hass.states.get(clock).state == STATE_ON
 
-    for mock_kwargs in ({"status": 500}, {"exc": aiohttp.ClientError()}):
+    for mock_kwargs, key in (
+        ({"status": 500}, "device_rejected"),
+        ({"exc": aiohttp.ClientError()}, "communication_error"),
+    ):
         aioclient_mock.clear_requests()
         aioclient_mock.post(f"{BASE_URL}/display/screens", **mock_kwargs)
-        await hass.services.async_call(
-            "switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: gas}, blocking=True
-        )
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                "switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: gas}, blocking=True
+            )
+        assert err.value.translation_key == key
         assert hass.states.get(gas).state == STATE_OFF
 
 
@@ -431,10 +438,12 @@ async def test_speaker(
     assert aioclient_mock.mock_calls[-1][2]["media_id"] == sample
     assert hass.states.get(entity_id).state == MediaPlayerState.PLAYING
 
-    # The device rejecting a command leaves the optimistic state alone.
-    await hass.services.async_call(
-        MEDIA_PLAYER_DOMAIN, SERVICE_MEDIA_STOP, {ATTR_ENTITY_ID: entity_id}, blocking=True
-    )
+    # The device rejecting a command raises and leaves the optimistic state alone.
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            MEDIA_PLAYER_DOMAIN, SERVICE_MEDIA_STOP, {ATTR_ENTITY_ID: entity_id}, blocking=True
+        )
+    assert err.value.translation_key == "request_failed"
     assert hass.states.get(entity_id).state == MediaPlayerState.PLAYING
 
     await websocket.push(

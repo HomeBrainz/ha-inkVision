@@ -9,7 +9,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 import homeassistant.helpers.config_validation as cv
 
@@ -67,11 +67,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
         brightness = call.data["brightness"]
 
         coordinator = _get_coordinator_for_device(hass, device_id)
-        success = await coordinator.send_device_command("set_brightness", value=brightness)
-        if success:
-            _LOGGER.info("Set brightness to %d for device %s", brightness, device_id)
-        else:
-            _LOGGER.error("Failed to set brightness for device %s", device_id)
+        if not await coordinator.send_device_command("set_brightness", value=brightness):
+            raise coordinator.error("not_connected")
+        _LOGGER.info("Set brightness to %d for device %s", brightness, device_id)
 
     async def display_text_service(call: ServiceCall) -> None:
         """Handle display text service call."""
@@ -79,22 +77,18 @@ def async_setup_services(hass: HomeAssistant) -> None:
         text = call.data["text"]
 
         coordinator = _get_coordinator_for_device(hass, device_id)
-        success = await coordinator.send_device_command("display_text", text=text)
-        if success:
-            _LOGGER.debug("Displayed text '%s' on device %s", text, device_id)
-        else:
-            _LOGGER.error("Failed to display text on device %s", device_id)
+        if not await coordinator.send_device_command("display_text", text=text):
+            raise coordinator.error("not_connected")
+        _LOGGER.debug("Displayed text '%s' on device %s", text, device_id)
 
     async def restart_device_service(call: ServiceCall) -> None:
         """Handle restart device service call."""
         device_id = call.data["device_id"]
 
         coordinator = _get_coordinator_for_device(hass, device_id)
-        success = await coordinator.send_device_command("restart")
-        if success:
-            _LOGGER.info("Restart command sent to device %s", device_id)
-        else:
-            _LOGGER.error("Failed to restart device %s", device_id)
+        if not await coordinator.send_device_command("restart"):
+            raise coordinator.error("not_connected")
+        _LOGGER.info("Restart command sent to device %s", device_id)
 
     async def set_screen_rotation_service(call: ServiceCall) -> None:
         """Handle screen rotation service call."""
@@ -107,8 +101,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             screens = [screen.strip() for screen in screens.split(",") if screen.strip()]
 
         if not screens:
-            _LOGGER.error("No screens provided for device %s", device_id)
-            return
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_screens")
 
         try:
             async with asyncio.timeout(10):
@@ -116,18 +109,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     f"http://{coordinator.host}/display/screens",
                     json={"screens": screens},
                 ) as response:
-                    if response.status == 200:
-                        _LOGGER.info("Updated screen rotation for device %s", device_id)
-                    else:
-                        _LOGGER.error(
-                            "Failed to update screen rotation for device %s: %s",
-                            device_id,
-                            response.status,
-                        )
+                    if response.status != 200:
+                        raise coordinator.error("device_rejected", status=str(response.status))
         except aiohttp.ClientError as err:
-            _LOGGER.error("HTTP error updating screen rotation for device %s: %s", device_id, err)
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout updating screen rotation for device %s", device_id)
+            raise coordinator.error("communication_error", error=str(err)) from err
+        except asyncio.TimeoutError as err:
+            raise coordinator.error("communication_error", error="timeout") from err
+        _LOGGER.info("Updated screen rotation for device %s", device_id)
 
     async def set_timezone_service(call: ServiceCall) -> None:
         """Handle set timezone service call."""
@@ -135,11 +123,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
         timezone = call.data["timezone"]
 
         coordinator = _get_coordinator_for_device(hass, device_id)
-        success = await coordinator.async_set_timezone(timezone)
-        if success:
-            _LOGGER.info("Set timezone to %s for device %s", timezone, device_id)
-        else:
-            _LOGGER.error("Failed to set timezone for device %s", device_id)
+        if not await coordinator.async_set_timezone(timezone):
+            raise coordinator.error("request_failed")
+        _LOGGER.info("Set timezone to %s for device %s", timezone, device_id)
 
     async def set_custom_screen_service(call: ServiceCall) -> None:
         """Handle set custom screen service call."""
@@ -149,7 +135,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         coordinator = _get_coordinator_for_device(hass, device_id)
 
         if not coordinator.custom_screens_supported:
-            raise HomeAssistantError("This device's firmware does not support custom screens.")
+            raise coordinator.error("custom_screens_unsupported")
 
         await coordinator.async_set_custom_screen(slot, call.data["text"])
 

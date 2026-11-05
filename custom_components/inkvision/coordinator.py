@@ -13,6 +13,7 @@ from websockets.exceptions import ConnectionClosedError, WebSocketException
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -327,6 +328,14 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                         "config": config_snapshot,
                     })
 
+    def error(self, translation_key: str, **placeholders: str) -> HomeAssistantError:
+        """Return a translated error whose message names this device."""
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=translation_key,
+            translation_placeholders={"device": self.config_entry.title, **placeholders},
+        )
+
     async def send_device_command(self, command: str, **kwargs):
         """Send a command to the device."""
         if self._websocket_connected:
@@ -532,14 +541,22 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                     if response.status == 200:
                         sensor_data = await response.json()
                     else:
-                        raise UpdateFailed(f"Error communicating with device: {response.status}")
+                        raise UpdateFailed(
+                            translation_domain=DOMAIN,
+                            translation_key="update_failed_status",
+                            translation_placeholders={"status": str(response.status)},
+                        )
                 
                 # Fetch status data
                 async with self.session.get(f"http://{self.host}/status") as response:
                     if response.status == 200:
                         status_data = await response.json()
                     else:
-                        raise UpdateFailed(f"Error communicating with device: {response.status}")
+                        raise UpdateFailed(
+                            translation_domain=DOMAIN,
+                            translation_key="update_failed_status",
+                            translation_placeholders={"status": str(response.status)},
+                        )
 
                 screens_data = None
                 try:
@@ -583,6 +600,14 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                 }
                 
         except aiohttp.ClientError as err:
-            raise UpdateFailed(f"Error communicating with API: {err}")
-        except asyncio.TimeoutError:
-            raise UpdateFailed("Timeout communicating with API")
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        except asyncio.TimeoutError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": "timeout"},
+            ) from err

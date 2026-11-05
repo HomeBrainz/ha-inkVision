@@ -96,6 +96,54 @@
     },
     "device_not_loaded": {
       "message": "{device} is not loaded. Check that it is online and enabled."
+    },
+    "not_connected": {
+      "message": "{device} is not connected. Check that it is powered on and connected to your network."
+    },
+    "communication_error": {
+      "message": "Could not reach {device}: {error}"
+    },
+    "request_failed": {
+      "message": "{device} did not carry out the command. Check that it is online; the log has details."
+    },
+    "device_rejected": {
+      "message": "{device} rejected the request (HTTP {status})."
+    },
+    "no_screens": {
+      "message": "Select at least one screen."
+    },
+    "last_screen": {
+      "message": "At least one screen must stay in the rotation."
+    },
+    "custom_screens_unsupported": {
+      "message": "The firmware of {device} does not support custom screens. Update the firmware first."
+    },
+    "unsupported_timezone": {
+      "message": "Unsupported timezone: {timezone}"
+    },
+    "unsupported_button_action": {
+      "message": "Unsupported button action: {action}"
+    },
+    "update_check_failed": {
+      "message": "Could not check {device} for a firmware update. Check that it is online."
+    },
+    "update_check_error": {
+      "message": "The firmware update check for {device} failed: {error}"
+    },
+    "firmware_up_to_date": {
+      "message": "The firmware of {device} is already up to date ({version})."
+    },
+    "no_download_url": {
+      "message": "The update server did not provide a download URL for {device}."
+    },
+    "firmware_update_rejected": {
+      "message": "{device} rejected the firmware update (HTTP {status}): {details}"
+    },
+    "update_failed_status": {
+      "message": "The device answered with HTTP {status}."
+    },
+    "update_failed": {
+      "message": "Error communicating with the device: {error}"
     }
   }
 }

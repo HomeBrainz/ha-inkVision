@@ -6,7 +6,6 @@ import logging
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
@@ -72,7 +71,7 @@ class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
         """Show the message on the device's display (auto-reverts on its own after a timeout)."""
         success = await self.coordinator.send_device_command("display_text", text=value)
         if not success:
-            raise HomeAssistantError("Unable to display text on inkVision device.")
+            raise self.coordinator.error("not_connected")
 
         self._attr_native_value = value[:CUSTOM_TEXT_MAX_LEN]
         self.async_write_ha_state()

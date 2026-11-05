@@ -7,7 +7,6 @@ import logging
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
@@ -70,7 +69,7 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
         brightness = max(self._attr_native_min_value, min(self._attr_native_max_value, int(round(value))))
 
         if not await self.coordinator.send_device_command("set_brightness", value=brightness):
-            raise HomeAssistantError("Unable to send brightness command to inkVision device.")
+            raise self.coordinator.error("not_connected")
 
         existing = self.coordinator.data or {"sensors": {}, "status": {}}
         new_data = deepcopy(existing)

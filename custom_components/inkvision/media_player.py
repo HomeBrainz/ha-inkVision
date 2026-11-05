@@ -192,18 +192,20 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute/unmute playback."""
         success = await self.coordinator.async_speaker_command("mute", muted=mute)
-        if success:
-            self._optimistic_is_muted = mute
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        self._optimistic_is_muted = mute
+        self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level."""
         volume = max(0.0, min(1.0, volume))
         percent = int(round(volume * 100))
         success = await self.coordinator.async_speaker_command("set_volume", value=percent)
-        if success:
-            self._optimistic_volume_level = volume
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        self._optimistic_volume_level = volume
+        self.async_write_ha_state()
 
     async def async_media_play(self) -> None:
         """Resume playback."""
@@ -216,24 +218,27 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
             )
         else:
             success = await self.coordinator.async_speaker_command("play")
-        if success:
-            self._optimistic_state = MediaPlayerState.PLAYING
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        self._optimistic_state = MediaPlayerState.PLAYING
+        self.async_write_ha_state()
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
         success = await self.coordinator.async_speaker_command("pause")
-        if success:
-            # Current firmware maps pause to stop.
-            self._optimistic_state = MediaPlayerState.IDLE
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        # Current firmware maps pause to stop.
+        self._optimistic_state = MediaPlayerState.IDLE
+        self.async_write_ha_state()
 
     async def async_media_stop(self) -> None:
         """Stop playback."""
         success = await self.coordinator.async_speaker_command("stop")
-        if success:
-            self._optimistic_state = MediaPlayerState.IDLE
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        self._optimistic_state = MediaPlayerState.IDLE
+        self.async_write_ha_state()
 
     async def async_play_media(
         self,
@@ -258,11 +263,12 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
             payload["enqueue"] = str(enqueue)
 
         success = await self.coordinator.async_speaker_command("play_media", **payload)
-        if success:
-            self._last_media_id = media_id
-            self._last_media_type = str(media_type)
-            self._optimistic_state = MediaPlayerState.PLAYING
-            self.async_write_ha_state()
+        if not success:
+            raise self.coordinator.error("request_failed")
+        self._last_media_id = media_id
+        self._last_media_type = str(media_type)
+        self._optimistic_state = MediaPlayerState.PLAYING
+        self.async_write_ha_state()
 
     async def _resolve_media_id(self, media_id: str) -> str:
         """Resolve a media ID to a URL the device can fetch and play.

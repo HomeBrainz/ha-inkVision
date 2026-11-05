@@ -10,7 +10,6 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
@@ -87,17 +86,17 @@ class InkVisionFirmwareUpdateButton(InkVisionButtonEntity):
         await self.coordinator.async_update_ota_status()
         ota = (self.coordinator.data or {}).get("ota", {})
         if not isinstance(ota, dict) or not ota:
-            raise HomeAssistantError("Could not check for a firmware update; is the device online?")
+            raise self.coordinator.error("update_check_failed")
         if ota.get("error"):
-            raise HomeAssistantError(f"Firmware update check failed: {ota['error']}")
+            raise self.coordinator.error("update_check_error", error=str(ota["error"]))
         if not ota.get("updateAvailable"):
-            raise HomeAssistantError(
-                f"Firmware is already up to date ({ota.get('currentVersion', 'unknown')})"
+            raise self.coordinator.error(
+                "firmware_up_to_date", version=str(ota.get("currentVersion", "unknown"))
             )
 
         download_url = ota.get("downloadUrl")
         if not download_url:
-            raise HomeAssistantError("The update server did not provide a download URL")
+            raise self.coordinator.error("no_download_url")
 
         try:
             async with asyncio.timeout(15):
@@ -107,11 +106,11 @@ class InkVisionFirmwareUpdateButton(InkVisionButtonEntity):
                 ) as response:
                     if response.status != 200:
                         body = await response.text()
-                        raise HomeAssistantError(
-                            f"Device rejected the firmware update ({response.status}): {body[:200]}"
+                        raise self.coordinator.error(
+                            "firmware_update_rejected", status=str(response.status), details=body[:200]
                         )
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise HomeAssistantError(f"Could not reach the device to start the update: {err}") from err
+            raise self.coordinator.error("communication_error", error=str(err) or "timeout") from err
 
         _LOGGER.info(
             "Firmware update to %s started on %s; the device reboots when done",
