@@ -6,8 +6,11 @@ Assistant core.
 
 On startup every "homebrainz" config entry is imported as an "inkvision"
 entry. Before the new entry loads, the old entry's devices and entities move
-over to it, so entity IDs, history and device IDs stay the same; then the old
-entry is removed. The old "homebrainz.*" actions keep working as aliases.
+over to it, so entity IDs, history and device IDs stay the same. The emptied
+old entry is disabled rather than removed while the old folder is still
+installed: its code would otherwise rediscover the device and add it again.
+Once the folder is gone, the next start removes it. The old "homebrainz.*"
+actions keep working as aliases.
 """
 from __future__ import annotations
 
@@ -20,7 +23,12 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import (
+    SOURCE_IMPORT,
+    ConfigEntry,
+    ConfigEntryDisabler,
+    ConfigEntryState,
+)
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
@@ -62,11 +70,31 @@ def remove_legacy_folder(hass: HomeAssistant) -> None:
         shutil.rmtree(path)
 
 
+def _is_emptied(hass: HomeAssistant, old: ConfigEntry) -> bool:
+    """True for an old entry whose devices and entities were already moved."""
+    return old.disabled_by is not None and not er.async_entries_for_config_entry(
+        er.async_get(hass), old.entry_id
+    )
+
+
 async def async_setup_legacy(hass: HomeAssistant) -> None:
     """Import homebrainz entries and flag a leftover homebrainz folder."""
-    configured = {entry.unique_id for entry in hass.config_entries.async_entries(DOMAIN)}
+    folder_installed = await hass.async_add_executor_job(_is_legacy_folder, legacy_folder(hass))
+    entries = hass.config_entries.async_entries(DOMAIN)
+    configured = {entry.unique_id for entry in entries}
+    # Old entries a new entry is about to take over (e.g. started by discovery).
+    taking_over = {entry.data.get(CONF_MIGRATE_FROM) for entry in entries}
+    duplicates: set[str] = set()
     for old in hass.config_entries.async_entries(LEGACY_DOMAIN):
+        if old.entry_id in taking_over:
+            continue
+        if old.unique_id in configured and _is_emptied(hass, old):
+            if not folder_installed:
+                # Its code is gone, so it can't rediscover the device any more.
+                await hass.config_entries.async_remove(old.entry_id)
+            continue
         if old.unique_id in configured:
+            duplicates.add(old.entry_id)
             # The device was also added under the new name; leave the old one to the user.
             ir.async_create_issue(
                 hass,
@@ -87,7 +115,18 @@ async def async_setup_legacy(hass: HomeAssistant) -> None:
             )
         )
 
-    if await hass.async_add_executor_job(_is_legacy_folder, legacy_folder(hass)):
+    # Drop notices from earlier starts that no longer apply.
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if (
+            domain == DOMAIN
+            and issue_id.startswith(ISSUE_LEGACY_DUPLICATE_PREFIX)
+            and issue_id.removeprefix(ISSUE_LEGACY_DUPLICATE_PREFIX) not in duplicates
+        ):
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+    if not folder_installed:
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_LEGACY_FOLDER)
+    else:
         ir.async_create_issue(
             hass,
             DOMAIN,
@@ -136,7 +175,12 @@ async def async_take_over_legacy_entry(hass: HomeAssistant, entry: ConfigEntry) 
             )
             device_registry.async_update_device(device.id, remove_config_entry_id=old_id)
 
-        await hass.config_entries.async_remove(old_id)
+        if await hass.async_add_executor_job(_is_legacy_folder, legacy_folder(hass)):
+            # Removing it would let the old code rediscover the device and add it back.
+            await hass.config_entries.async_set_disabled_by(old_id, ConfigEntryDisabler.USER)
+        else:
+            await hass.config_entries.async_remove(old_id)
+        ir.async_delete_issue(hass, DOMAIN, f"{ISSUE_LEGACY_DUPLICATE_PREFIX}{old_id}")
         _LOGGER.info("Moved %s from %s to %s", entry.title, LEGACY_DOMAIN, DOMAIN)
 
     hass.config_entries.async_update_entry(

@@ -1,15 +1,18 @@
 """Tests for taking over installs from before the rename (domain "homebrainz")."""
 from __future__ import annotations
 
+from ipaddress import ip_address
 import json
 from pathlib import Path
 from unittest.mock import patch
 
+from homeassistant.config_entries import SOURCE_ZEROCONF, ConfigEntryDisabler
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -18,10 +21,11 @@ from custom_components.inkvision.const import DOMAIN, LEGACY_DOMAIN
 from custom_components.inkvision.legacy_migration import (
     CONF_MIGRATE_FROM,
     ISSUE_LEGACY_FOLDER,
+    async_setup_legacy,
     legacy_folder,
 )
 
-from .conftest import HOST, MAC, FakeWebSocketFactory, mock_device_http
+from .conftest import BASE_URL, HOST, INFO_PAYLOAD, MAC, FakeWebSocketFactory, mock_device_http
 
 OLD_ENTRY_ID = "01OLDHOMEBRAINZENTRY0000000"
 
@@ -196,3 +200,108 @@ async def test_unrelated_folder_is_kept(hass: HomeAssistant, tmp_path: Path) -> 
 
     assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_LEGACY_FOLDER) is None
     assert folder.exists()
+
+
+async def test_discovery_takes_over_legacy_entry(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_websocket: FakeWebSocketFactory,
+) -> None:
+    """Test discovering a device still set up under homebrainz moves it instead of adding it again.
+
+    With no inkvision entry yet the integration isn't loaded at startup, so
+    discovery is what triggers the first takeover.
+    """
+    mock_device_http(aioclient_mock)
+    aioclient_mock.get(f"{BASE_URL}/api/info", json=INFO_PAYLOAD)
+    _, device_id, entity_id = _add_legacy_install(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_ZEROCONF},
+        data=ZeroconfServiceInfo(
+            ip_address=ip_address(HOST),
+            ip_addresses=[ip_address(HOST)],
+            port=80,
+            hostname="atmos-eeff.local.",
+            type="_http._tcp.local.",
+            name="atmos-eeff._http._tcp.local.",
+            properties={},
+        ),
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] == "create_entry"
+    assert result["title"] == "Atmos Smart Clock"
+    assert hass.config_entries.async_entries(LEGACY_DOMAIN) == []
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert entry.options == {"custom_screen_1": "{{ 21 }}"}
+    assert er.async_get(hass).async_get(entity_id).config_entry_id == entry.entry_id
+    assert dr.async_get(hass).async_get(device_id).config_entries == {entry.entry_id}
+    assert not [
+        issue for (domain, issue) in ir.async_get(hass).issues if issue.startswith("legacy_duplicate")
+    ]
+
+    await _unload_all(hass)
+
+
+async def test_user_flow_takes_over_legacy_entry(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_websocket: FakeWebSocketFactory,
+) -> None:
+    """Test adding a device by hand that is still set up under homebrainz moves it."""
+    mock_device_http(aioclient_mock)
+    aioclient_mock.get(f"{BASE_URL}/api/info", json=INFO_PAYLOAD)
+    _, _, entity_id = _add_legacy_install(hass)
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: HOST})
+    await hass.async_block_till_done()
+
+    assert result["type"] == "create_entry"
+    assert hass.config_entries.async_entries(LEGACY_DOMAIN) == []
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert er.async_get(hass).async_get(entity_id).config_entry_id == entry.entry_id
+
+    await _unload_all(hass)
+
+
+async def test_legacy_entry_disabled_while_old_folder_installed(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_websocket: FakeWebSocketFactory,
+    tmp_path: Path,
+) -> None:
+    """Test the emptied old entry is disabled, not removed, until the old folder is gone.
+
+    Removing it while the old code is installed lets that code rediscover the
+    device and add it back under homebrainz.
+    """
+    hass.config.config_dir = str(tmp_path)
+    folder = legacy_folder(hass)
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(json.dumps({"domain": LEGACY_DOMAIN}))
+    mock_device_http(aioclient_mock)
+    old, _, entity_id = _add_legacy_install(hass)
+
+    await _setup(hass)
+
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert er.async_get(hass).async_get(entity_id).config_entry_id == entry.entry_id
+    kept = hass.config_entries.async_get_entry(old.entry_id)
+    assert kept is not None
+    assert kept.disabled_by is ConfigEntryDisabler.USER
+    assert not [issue for (_, issue) in ir.async_get(hass).issues if issue.startswith("legacy_duplicate")]
+
+    # Next start after the repair deleted the folder: the emptied entry goes away.
+    (folder / "manifest.json").unlink()
+    folder.rmdir()
+    await async_setup_legacy(hass)
+    await hass.async_block_till_done()
+
+    assert hass.config_entries.async_get_entry(old.entry_id) is None
+    assert er.async_get(hass).async_get(entity_id).config_entry_id == entry.entry_id
+    assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_LEGACY_FOLDER) is None
+
+    await _unload_all(hass)

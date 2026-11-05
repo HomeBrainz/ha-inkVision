@@ -21,7 +21,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for older HA cores
     from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
-from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN
+from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN, LEGACY_DOMAIN
 from .legacy_migration import CONF_MIGRATE_FROM
 
 _LOGGER = logging.getLogger(__name__)
@@ -214,10 +214,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # moved it) and let HA reload an entry stuck in setup retry right away
         # instead of waiting out the retry backoff (up to 10 minutes).
         self._abort_if_unique_id_configured(updates={CONF_HOST: info["host"]})
+        if (old := self._async_legacy_entry()) is not None:  # legacy: HACS-only
+            return await self.async_step_import(
+                {**old.data, CONF_HOST: info["host"], CONF_MIGRATE_FROM: old.entry_id}
+            )
 
         return self.async_create_entry(
             title=info["title"],
             data={CONF_HOST: info["host"]},
+        )
+
+    @callback
+    def _async_legacy_entry(self) -> config_entries.ConfigEntry | None:
+        """Return the "homebrainz" entry for this device, if it was set up before the rename.
+
+        Legacy, HACS-only. The integration only loads once it has an entry, so the
+        first takeover happens here, when the device is discovered or added again;
+        setting up that entry then imports any other homebrainz entries.
+        """
+        return next(
+            (
+                entry
+                for entry in self.hass.config_entries.async_entries(LEGACY_DOMAIN)
+                if entry.unique_id == self.unique_id
+            ),
+            None,
         )
 
     async def async_step_import(self, import_data: dict[str, Any]) -> FlowResult:
@@ -251,7 +272,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 unique_id = info["mac_address"] if info["mac_address"] else info["host"]
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
-                
+                if (old := self._async_legacy_entry()) is not None:  # legacy: HACS-only
+                    return await self.async_step_import(
+                        {**old.data, CONF_HOST: info["host"], CONF_MIGRATE_FROM: old.entry_id}
+                    )
+
                 return self.async_create_entry(
                     title=info["title"],
                     data={CONF_HOST: info["host"]},

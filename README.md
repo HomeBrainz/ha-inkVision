@@ -58,7 +58,7 @@ You can find the device's IP address in your router's list of connected devices.
 This integration used to be called HomeBrainz (`homebrainz`). After you update it in HACS and restart Home Assistant, your devices move to inkVision automatically. Entity IDs, history, dashboards and device IDs stay the same.
 
 - Actions were renamed from `homebrainz.*` to `inkvision.*`. The old names keep working; when an automation or script uses one, a notice under **Settings** > **Repairs** tells you which action to change.
-- HACS leaves the old `custom_components/homebrainz` folder behind. A repair notice offers to delete it; restart Home Assistant afterwards.
+- HACS leaves the old `custom_components/homebrainz` folder behind. A repair notice offers to delete it; restart Home Assistant afterwards. Until then the old entries stay under HomeBrainz as disabled, so the old code cannot add the devices again; they are removed on the first start without the folder.
 
 ## Entities
 

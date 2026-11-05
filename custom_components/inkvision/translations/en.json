@@ -56,7 +56,7 @@
         "step": {
           "confirm": {
             "title": "Remove the old HomeBrainz integration",
-            "description": "The HomeBrainz integration is now called inkVision, and your devices were moved to it. HACS left the old integration's folder behind at `{path}`, where it can still discover devices as \"HomeBrainz\".\n\nSelect **Submit** to delete the folder, then restart Home Assistant."
+            "description": "The HomeBrainz integration is now called inkVision, and your devices were moved to it. HACS left the old integration's folder behind at `{path}`, where it can still discover devices as \"HomeBrainz\". Until it is gone, the old entries stay under HomeBrainz as disabled; they are removed automatically afterwards.\n\nSelect **Submit** to delete the folder, then restart Home Assistant."
           }
         }
       }
