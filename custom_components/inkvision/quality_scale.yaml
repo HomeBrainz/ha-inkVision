@@ -13,8 +13,10 @@ rules:
     status: done
     comment: WebSocket push is primary; HTTP polling every 5 minutes is only a fallback.
   brands:
-    status: todo
-    comment: Only a local brand/ folder; core needs a home-assistant/brands PR with the inkVision icons.
+    status: done
+    comment: >-
+      Icons for home-assistant/brands are in docs/brands/core_integrations/inkvision, submitted
+      with the core pull request.
   common-modules:
     status: done
     comment: The coordinator is in coordinator.py, and the shared device_info is in the InkVisionEntity base class in entity.py.
@@ -28,22 +30,19 @@ rules:
     status: done
     comment: tests/test_config_flow.py covers config_flow.py at 100%.
   dependency-transparency:
-    status: todo
+    status: done
     comment: >-
-      The device protocol (WebSocket/HTTP client) lives in the integration. Core requires it in a
-      separate, open-source library published to PyPI by CI.
+      Device communication is in pyinkvision (https://github.com/HomeBrainz/pyinkvision, MIT),
+      released to PyPI from GitHub Actions with trusted publishing.
   docs-actions:
-    status: todo
-    comment: Needs the home-assistant.io integration page.
+    status: done
+    comment: Drafted in docs/home-assistant.io/inkvision.markdown, submitted with the core pull request.
   docs-conditions:
     status: exempt
     comment: The integration provides no conditions.
-  docs-high-level-description:
-    status: todo
-  docs-installation-instructions:
-    status: todo
-  docs-removal-instructions:
-    status: todo
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
   docs-triggers:
     status: exempt
     comment: The integration provides no triggers; button gestures are event entities.
@@ -165,13 +164,11 @@ rules:
 
   # Platinum
   async-dependency:
-    status: todo
-    comment: Depends on the library split; the library must be fully async.
+    status: done
+    comment: pyinkvision is asyncio-only (aiohttp).
   inject-websession:
-    status: todo
-    comment: >-
-      HTTP already uses HA's shared session, but the WebSocket opens its own connection with the
-      websockets package. Switching to aiohttp ws_connect on the injected session drops that dependency.
+    status: done
+    comment: pyinkvision takes HA's shared aiohttp session for HTTP and the WebSocket.
   strict-typing:
     status: todo
     comment: Many functions lack type hints; the library and integration need to pass mypy --strict.
