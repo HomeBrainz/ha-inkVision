@@ -84,7 +84,7 @@ Custom screen 1 to 4:
 
 ### Sensors
 
-- **Temperature**: Room temperature. The sensor sits inside the clock, so it reads a little above the room temperature while the display is bright.
+- **Temperature**: Room temperature, corrected for the heat of the clock's own display.
 - **Humidity**: Relative humidity.
 - **Atmospheric pressure**
 - **Indoor air quality**: The IAQ index of the Bosch BME680 sensor, from 0 (clean air) to 500 (heavily polluted air). 0–50 is excellent, 51–100 good, 101–150 lightly polluted, 151–200 moderately polluted, above 200 heavily polluted.

@@ -96,7 +96,7 @@ Entities marked *disabled by default* can be enabled on the device page: click t
 
 Entity | Description
 -- | --
-**Temperature** | Room temperature in °C. The sensor sits inside the clock, so it reads a little above the room temperature while the display is bright.
+**Temperature** | Room temperature in °C. The clock corrects the reading for the heat of its own display.
 **Humidity** | Relative humidity in %.
 **Atmospheric pressure** | Air pressure in hPa.
 **Indoor air quality** | The IAQ index of the BME680 sensor, from 0 (clean air) to 500 (heavily polluted air). 0–50 is excellent, 51–100 good, 101–150 lightly polluted, 151–200 moderately polluted, above 200 heavily polluted.
