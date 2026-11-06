@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import timedelta
 import json
 import logging
+import re
 
 import aiohttp
 import websockets
@@ -15,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CUSTOM_SCREEN_SLOTS, DOMAIN
@@ -27,6 +29,24 @@ UPDATE_INTERVAL = timedelta(seconds=300)  # 5 minute fallback polling (WebSocket
 WEBSOCKET_RETRY_DELAY = 10  # seconds
 WEBSOCKET_MAX_RETRY_DELAY = 30  # seconds
 
+_MAC = re.compile(r"(?:[0-9a-f]{2}:){5}[0-9a-f]{2}")
+
+
+def normalize_mac(value: str) -> str | None:
+    """Return a MAC the way format_mac writes it, or None if value is no MAC."""
+    mac = format_mac(value)
+    return mac if _MAC.fullmatch(mac) else None
+
+
+def device_key(entry: ConfigEntry) -> str:
+    """Return the device identifier, which also prefixes the entry's entity unique IDs.
+
+    It is the device's MAC, or the entry ID for devices that were added without one.
+    """
+    if entry.unique_id and _MAC.fullmatch(entry.unique_id):
+        return entry.unique_id
+    return entry.entry_id
+
 
 class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the inkVision device via WebSocket."""
@@ -37,6 +57,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         host = config_entry.data["host"]
         self.host = host
+        self.device_key = device_key(config_entry)
         self.session = async_get_clientsession(hass)
         self._websocket = None
         self._websocket_url = f"ws://{host}/ws"
@@ -532,6 +553,46 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
             "ota": ota_data,
             "config": config_snapshot,
         })
+
+    async def async_install_firmware(self) -> str:
+        """Re-check for an update, start installing it, and return its version.
+
+        The device downloads and flashes the image itself, then reboots.
+        """
+        # The cached OTA data can be hours old; always act on a fresh check.
+        await self.async_update_ota_status()
+        ota = (self.data or {}).get("ota", {})
+        if not isinstance(ota, dict) or not ota:
+            raise self.error("update_check_failed")
+        if ota.get("error"):
+            raise self.error("update_check_error", error=str(ota["error"]))
+        if not ota.get("updateAvailable"):
+            raise self.error("firmware_up_to_date", version=str(ota.get("currentVersion", "unknown")))
+
+        download_url = ota.get("downloadUrl")
+        if not download_url:
+            raise self.error("no_download_url")
+
+        try:
+            async with asyncio.timeout(15):
+                async with self.session.post(
+                    f"http://{self.host}/api/ota/update",
+                    json={"url": download_url, "confirm": True},
+                ) as response:
+                    if response.status != 200:
+                        body = await response.text()
+                        raise self.error(
+                            "firmware_update_rejected", status=str(response.status), details=body[:200]
+                        )
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise self.error("communication_error", error=str(err) or "timeout") from err
+
+        _LOGGER.info(
+            "Firmware update to %s started on %s; the device reboots when done",
+            ota.get("latestVersion"),
+            self.host,
+        )
+        return str(ota.get("latestVersion"))
 
     async def _async_update_data(self):
         """Update data via HTTP (fallback when WebSocket is not available)."""

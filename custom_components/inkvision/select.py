@@ -102,8 +102,7 @@ async def async_setup_entry(
 class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
     """Select entity for device timezone."""
 
-    _attr_name = "Timezone"
-    _attr_icon = "mdi:map-clock-outline"
+    _attr_translation_key = "timezone"
     _attr_options = SUPPORTED_TIMEZONES
 
     def __init__(
@@ -114,7 +113,7 @@ class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
         super().__init__(coordinator)
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
-        self._attr_unique_id = f"{config_entry.entry_id}_timezone"
+        self._attr_unique_id = f"{coordinator.device_key}_timezone"
 
     @property
     def current_option(self) -> str | None:
@@ -152,7 +151,7 @@ BUTTON_ACTIONS = {
     "prev_screen": "prevScreen",
     "toggle_screen": "toggleScreen",
 }
-GESTURE_NAMES = {"singleTap": "tap", "longPress": "long press"}
+GESTURE_TRANSLATION_KEYS = {"singleTap": "button_tap_action", "longPress": "button_long_press_action"}
 
 
 class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
@@ -161,10 +160,8 @@ class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
     "none" leaves the gesture to Home Assistant automations (event entities).
     """
 
-    _attr_icon = "mdi:gesture-tap-button"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = list(BUTTON_ACTIONS)
-    _attr_translation_key = "button_action"
 
     def __init__(
         self,
@@ -178,8 +175,9 @@ class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
         self._host = config_entry.data["host"]
         self._button = button
         self._gesture = gesture
-        self._attr_name = f"Button {button[-1]} {GESTURE_NAMES[gesture]} action"
-        self._attr_unique_id = f"{config_entry.entry_id}_{button}_{gesture}_action"
+        self._attr_translation_key = GESTURE_TRANSLATION_KEYS[gesture]
+        self._attr_translation_placeholders = {"number": button[-1]}
+        self._attr_unique_id = f"{coordinator.device_key}_{button}_{gesture}_action"
 
     @property
     def available(self) -> bool:

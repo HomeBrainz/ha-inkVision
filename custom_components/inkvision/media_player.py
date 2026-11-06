@@ -66,7 +66,7 @@ async def async_setup_entry(
 class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
     """inkVision speaker exposed as a Home Assistant media player."""
 
-    _attr_name = "Speaker"
+    _attr_translation_key = "speaker"
     _attr_supported_features = SPEAKER_FEATURES
 
     def __init__(
@@ -78,7 +78,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         super().__init__(coordinator)
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
-        self._attr_unique_id = f"{config_entry.entry_id}_speaker"
+        self._attr_unique_id = f"{coordinator.device_key}_speaker"
 
         # Optimistic fallback state for older firmware responses.
         self._optimistic_state = MediaPlayerState.IDLE

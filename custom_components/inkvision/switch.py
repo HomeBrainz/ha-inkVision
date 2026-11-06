@@ -30,14 +30,6 @@ DEFAULT_SCREEN_ORDER = [
     "iaq",
 ]
 
-SCREEN_LABELS = {
-    "clock": "Clock",
-    "temp": "Temperature",
-    "humidity": "Humidity",
-    "pressure": "Pressure",
-    "gas": "Gas",
-    "iaq": "IAQ",
-}
 
 
 async def async_setup_entry(
@@ -53,7 +45,6 @@ async def async_setup_entry(
             coordinator,
             config_entry,
             screen_id=screen_id,
-            name=SCREEN_LABELS[screen_id],
         )
         for screen_id in DEFAULT_SCREEN_ORDER
     ]
@@ -83,12 +74,11 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
         config_entry: ConfigEntry,
         *,
         screen_id: str,
-        name: str,
     ) -> None:
         super().__init__(coordinator, config_entry)
         self._screen_id = screen_id
-        self._attr_unique_id = f"{config_entry.entry_id}_screen_{screen_id}"
-        self._attr_name = f"Screen {name}"
+        self._attr_unique_id = f"{coordinator.device_key}_screen_{screen_id}"
+        self._attr_translation_key = f"screen_{screen_id}"
 
     @property
     def is_on(self) -> bool:

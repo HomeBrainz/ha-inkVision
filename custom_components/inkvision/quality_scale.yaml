@@ -51,10 +51,10 @@ rules:
     comment: The event entity subscribes in async_added_to_hass and unsubscribes via async_on_remove.
   entity-unique-id:
     status: done
-    comment: All entities have unique IDs, but they are derived from the config entry ID; prefer the device MAC.
-  has-entity-name:
-    status: todo
-    comment: No entity sets _attr_has_entity_name; names are hard-coded strings.
+    comment: >-
+      Unique IDs start with the device MAC (entry ID for devices added without one); entries
+      from before 3.2 are migrated.
+  has-entity-name: done
   runtime-data:
     status: done
     comment: The coordinator is in entry.runtime_data, typed as InkVisionConfigEntry.
@@ -106,7 +106,7 @@ rules:
   # Gold
   devices:
     status: done
-    comment: One device per entry; identifiers fall back to the host when the MAC is missing, so prefer entry.unique_id.
+    comment: One device per entry, identified by its MAC (entry ID without one), with a MAC connection.
   diagnostics:
     status: done
     comment: Entry data and coordinator data, with host, MAC, IP, SSID and the OTA download URL redacted.
@@ -138,28 +138,26 @@ rules:
     comment: Diagnostic and config categories are set on firmware, network and button-action entities.
   entity-device-class:
     status: done
-    comment: Device classes are set where one exists (CO2, VOC, duration, update, button).
+    comment: Device classes are set where one exists (CO2, VOC, duration, firmware update, restart).
   entity-disabled-by-default:
-    status: todo
-    comment: Noisy diagnostics (IP, MAC, firmware ID, uptime) should be disabled by default.
-  entity-translations:
-    status: todo
-    comment: Only the button action select uses a translation_key.
+    status: done
+    comment: IP, MAC, uptime, reported brightness and the firmware detail sensors start disabled.
+  entity-translations: done
   exception-translations:
     status: done
     comment: >-
       Every raised exception, including UpdateFailed, uses a translation key from the exceptions
       section. The audio proxy view has requires_auth = False like core's ESPHome FFmpeg proxy:
       the device can't authenticate, so each URL carries a random 128-bit ID instead.
-  icon-translations:
-    status: todo
-    comment: Icons are set with _attr_icon and in sensor descriptions; move them to icons.json.
+  icon-translations: done
   reconfiguration-flow:
     status: done
     comment: The reconfigure step changes the host and aborts when the address belongs to a different device.
   repair-issues:
-    status: exempt
-    comment: No user-fixable conditions yet; a firmware-too-old issue would be a candidate.
+    status: done
+    comment: >-
+      Deprecated actions and the firmware entities replaced by the update entity raise issues
+      when used.
   stale-devices:
     status: exempt
     comment: One device per entry; removing the entry removes the device.

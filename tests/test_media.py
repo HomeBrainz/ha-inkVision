@@ -172,7 +172,7 @@ class _FakeProcess:
 
 async def _play_remote_stream(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     entity_id = er.async_get(hass).async_get_entity_id(
-        "media_player", DOMAIN, f"{entry.entry_id}_speaker"
+        "media_player", DOMAIN, f"{entry.unique_id}_speaker"
     )
     await hass.services.async_call(
         MEDIA_PLAYER_DOMAIN,

@@ -56,7 +56,7 @@ class InkVisionButtonEvent(InkVisionEntity, EventEntity):
 
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_event_types = EVENT_TYPES
-    _attr_icon = "mdi:gesture-tap-button"
+    _attr_translation_key = "button"
 
     def __init__(
         self,
@@ -68,8 +68,8 @@ class InkVisionButtonEvent(InkVisionEntity, EventEntity):
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
         self._button = button
-        self._attr_name = f"Button {button}"
-        self._attr_unique_id = f"{config_entry.entry_id}_button_{button}_event"
+        self._attr_translation_placeholders = {"number": str(button)}
+        self._attr_unique_id = f"{coordinator.device_key}_button_{button}_event"
 
     @property
     def available(self) -> bool:

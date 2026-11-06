@@ -47,7 +47,7 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Gas Resistance",
+            translation_key="gas_resistance",
             unique_id_suffix="gas_resistance",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "gas_resistance_kohm"),
             native_unit_of_measurement="kΩ",
@@ -57,7 +57,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Device Uptime",
+            translation_key="uptime",
+            enabled_default=False,
             unique_id_suffix="uptime",
             value_fn=lambda entity: entity.get_status_value("uptime"),
             device_class=SensorDeviceClass.DURATION,
@@ -68,7 +69,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Display Brightness",
+            translation_key="reported_brightness",
+            enabled_default=False,
             unique_id_suffix="brightness",
             value_fn=lambda entity: entity.get_status_value("brightness"),
             state_class=SensorStateClass.MEASUREMENT,
@@ -77,7 +79,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="IP Address",
+            translation_key="ip_address",
+            enabled_default=False,
             unique_id_suffix="ip_address",
             value_fn=lambda entity: entity.get_status_value("ip_address"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -85,7 +88,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="MAC Address",
+            translation_key="mac_address",
+            enabled_default=False,
             unique_id_suffix="mac_address",
             value_fn=lambda entity: entity.get_status_value("mac_address"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -93,7 +97,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Firmware Version",
+            translation_key="firmware_version",
+            enabled_default=False,
             unique_id_suffix="firmware_version",
             value_fn=lambda entity: entity.get_status_value("version"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -101,7 +106,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Firmware ID",
+            translation_key="firmware_id",
+            enabled_default=False,
             unique_id_suffix="firmware_id",
             value_fn=lambda entity: entity.get_ota_value("currentFirmwareId"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -109,7 +115,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Latest Firmware ID",
+            translation_key="latest_firmware_id",
+            enabled_default=False,
             unique_id_suffix="latest_firmware_id",
             value_fn=lambda entity: entity.get_ota_value("latestFirmwareId"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -117,7 +124,8 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Latest Firmware Version",
+            translation_key="latest_firmware_version",
+            enabled_default=False,
             unique_id_suffix="latest_firmware_version",
             value_fn=lambda entity: entity.get_ota_value("latestVersion"),
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -126,10 +134,9 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Indoor Air Quality",
+            translation_key="indoor_air_quality",
             unique_id_suffix="bsec_iaq",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "iaq"),
-            icon="mdi:air-filter",
             native_unit_of_measurement="IAQ",
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
@@ -137,19 +144,17 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="IAQ Accuracy",
+            translation_key="iaq_accuracy",
             unique_id_suffix="bsec_iaq_accuracy",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "iaq_accuracy"),
-            icon="mdi:tune-vertical",
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Static IAQ",
+            translation_key="static_iaq",
             unique_id_suffix="bsec_static_iaq",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "static_iaq"),
-            icon="mdi:air-filter",
             native_unit_of_measurement="IAQ",
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
@@ -157,7 +162,7 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="CO₂ Equivalent",
+            translation_key="co2_equivalent",
             unique_id_suffix="bsec_co2_equivalent",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "co2_equivalent"),
             device_class=SensorDeviceClass.CO2,
@@ -168,7 +173,7 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="Breath VOC",
+            translation_key="breath_voc",
             unique_id_suffix="bsec_breath_voc",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "breath_voc"),
             device_class=SensorDeviceClass.VOLATILE_ORGANIC_COMPOUNDS_PARTS,
@@ -179,10 +184,9 @@ async def async_setup_entry(
         InkVisionGenericSensor(
             coordinator,
             config_entry,
-            name="IAQ Rating",
+            translation_key="iaq_rating",
             unique_id_suffix="bsec_iaq_rating",
             value_fn=lambda entity: entity.get_sensor_value("bme680", "iaq_rating"),
-            icon="mdi:air-purifier",
         ),
     ]
 
@@ -244,20 +248,21 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
         coordinator: InkVisionDataUpdateCoordinator,
         config_entry: ConfigEntry,
         *,
-        name: str,
+        translation_key: str,
         unique_id_suffix: str,
         value_fn: Callable[[InkVisionSensorEntity], Any],
         device_class: SensorDeviceClass | None = None,
         native_unit_of_measurement: str | UnitOfTemperature | UnitOfPressure | None = None,
         state_class: SensorStateClass | None = None,
         entity_category: EntityCategory | None = None,
-        icon: str | None = None,
+        enabled_default: bool = True,
         suggested_display_precision: int | None = None,
         extra_attributes_fn: Callable[[InkVisionSensorEntity], dict[str, Any] | None] | None = None,
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_unique_id = f"{config_entry.entry_id}_{unique_id_suffix}"
-        self._attr_name = name
+        self._attr_unique_id = f"{coordinator.device_key}_{unique_id_suffix}"
+        self._attr_translation_key = translation_key
+        self._attr_entity_registry_enabled_default = enabled_default
         self._value_fn = value_fn
         self._extra_attributes_fn = extra_attributes_fn
 
@@ -269,8 +274,6 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
             self._attr_native_unit_of_measurement = native_unit_of_measurement
         if entity_category is not None:
             self._attr_entity_category = entity_category
-        if icon is not None:
-            self._attr_icon = icon
         if suggested_display_precision is not None:
             self._attr_suggested_display_precision = suggested_display_precision
 
@@ -280,7 +283,7 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
         try:
             value = self._value_fn(self)
         except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("inkVision sensor '%s' failed to compute value", self._attr_name)
+            _LOGGER.exception("inkVision sensor '%s' failed to compute value", self.entity_id)
             return None
         return value
 
@@ -291,7 +294,7 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
         try:
             attrs = self._extra_attributes_fn(self)
         except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("inkVision sensor '%s' failed to compute attributes", self._attr_name)
+            _LOGGER.exception("inkVision sensor '%s' failed to compute attributes", self.entity_id)
             return None
         return attrs
 
@@ -306,8 +309,7 @@ class InkVisionTemperatureSensor(InkVisionSensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry)
-        self._attr_unique_id = f"{config_entry.entry_id}_temperature"
-        self._attr_name = "Temperature"
+        self._attr_unique_id = f"{coordinator.device_key}_temperature"
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
@@ -342,8 +344,7 @@ class InkVisionHumiditySensor(InkVisionSensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry)
-        self._attr_unique_id = f"{config_entry.entry_id}_humidity"
-        self._attr_name = "Humidity"
+        self._attr_unique_id = f"{coordinator.device_key}_humidity"
         self._attr_device_class = SensorDeviceClass.HUMIDITY
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = PERCENTAGE
@@ -369,8 +370,7 @@ class InkVisionPressureSensor(InkVisionSensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry)
-        self._attr_unique_id = f"{config_entry.entry_id}_pressure"
-        self._attr_name = "Pressure"
+        self._attr_unique_id = f"{coordinator.device_key}_pressure"
         self._attr_device_class = SensorDeviceClass.ATMOSPHERIC_PRESSURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfPressure.HPA
@@ -396,8 +396,8 @@ class InkVisionWiFiSignalSensor(InkVisionSensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry)
-        self._attr_unique_id = f"{config_entry.entry_id}_wifi_signal"
-        self._attr_name = "WiFi Signal"
+        self._attr_unique_id = f"{coordinator.device_key}_wifi_signal"
+        self._attr_translation_key = "wifi_signal"
         self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT

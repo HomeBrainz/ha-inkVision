@@ -7,7 +7,11 @@ import logging
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.event import (
     TrackTemplate,
     TrackTemplateResult,
@@ -19,7 +23,12 @@ from homeassistant.helpers.typing import ConfigType
 
 from . import legacy_migration
 from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN
-from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
+from .coordinator import (
+    InkVisionConfigEntry,
+    InkVisionDataUpdateCoordinator,
+    device_key,
+    normalize_mac,
+)
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +46,7 @@ PLATFORMS: list[Platform] = [
     Platform.EVENT,
     Platform.MEDIA_PLAYER,
     Platform.TEXT,
+    Platform.UPDATE,
 ]
 
 
@@ -175,6 +185,27 @@ async def async_migrate_entry(hass: HomeAssistant, entry: InkVisionConfigEntry) 
             _LOGGER.info("Removed %d deprecated entities", removed)
 
         hass.config_entries.async_update_entry(entry, version=3)
+
+    if entry.version == 3 and entry.minor_version < 2:
+        # Key entities and the device by the MAC instead of the config entry ID.
+        if entry.unique_id and (mac := normalize_mac(entry.unique_id)):
+            hass.config_entries.async_update_entry(entry, unique_id=mac)
+        key = device_key(entry)
+        if key != entry.entry_id:
+            entity_registry = er.async_get(hass)
+            for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+                if entity.unique_id.startswith(f"{entry.entry_id}_"):
+                    entity_registry.async_update_entity(
+                        entity.entity_id,
+                        new_unique_id=entity.unique_id.replace(entry.entry_id, key, 1),
+                    )
+        device_registry = dr.async_get(hass)
+        for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+            device_registry.async_update_device(
+                device.id,
+                new_identifiers={(d, v) for d, v in device.identifiers if d != DOMAIN} | {(DOMAIN, key)},
+            )
+        hass.config_entries.async_update_entry(entry, minor_version=2)
 
     return True
 

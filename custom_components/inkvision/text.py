@@ -36,8 +36,7 @@ async def async_setup_entry(
 class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
     """Text entity that shows a custom message on the device's display."""
 
-    _attr_name = "Custom Message"
-    _attr_icon = "mdi:message-text-outline"
+    _attr_translation_key = "custom_message"
     _attr_mode = TextMode.TEXT
     _attr_native_max = CUSTOM_TEXT_MAX_LEN
 
@@ -49,7 +48,7 @@ class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
         super().__init__(coordinator)
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
-        self._attr_unique_id = f"{config_entry.entry_id}_custom_text"
+        self._attr_unique_id = f"{coordinator.device_key}_custom_text"
         self._attr_native_value = ""
 
     @property

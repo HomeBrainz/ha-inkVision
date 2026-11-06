@@ -25,7 +25,15 @@ from custom_components.inkvision.legacy_migration import (
     legacy_folder,
 )
 
-from .conftest import BASE_URL, HOST, INFO_PAYLOAD, MAC, FakeWebSocketFactory, mock_device_http
+from .conftest import (
+    BASE_URL,
+    HOST,
+    INFO_PAYLOAD,
+    MAC,
+    UNIQUE_ID,
+    FakeWebSocketFactory,
+    mock_device_http,
+)
 
 OLD_ENTRY_ID = "01OLDHOMEBRAINZENTRY0000000"
 
@@ -38,8 +46,9 @@ def _add_legacy_install(hass: HomeAssistant) -> tuple[MockConfigEntry, str, str]
         title="Atmos Smart Clock",
         data={CONF_HOST: HOST},
         options={"custom_screen_1": "{{ 21 }}"},
-        unique_id=MAC,
+        unique_id=UNIQUE_ID,
         version=3,
+        minor_version=2,
     )
     old.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
@@ -80,7 +89,7 @@ async def test_legacy_entry_is_taken_over(
 
     assert hass.config_entries.async_entries(LEGACY_DOMAIN) == []
     (entry,) = hass.config_entries.async_entries(DOMAIN)
-    assert entry.unique_id == MAC
+    assert entry.unique_id == UNIQUE_ID
     assert entry.title == "Atmos Smart Clock"
     assert entry.data == {CONF_HOST: HOST}
     assert entry.options == {"custom_screen_1": "{{ 21 }}"}
@@ -89,14 +98,14 @@ async def test_legacy_entry_is_taken_over(
     assert entity is not None
     assert entity.platform == DOMAIN
     assert entity.config_entry_id == entry.entry_id
-    assert entity.unique_id == f"{entry.entry_id}_ip_address"
+    assert entity.unique_id == f"{UNIQUE_ID}_ip_address"
     # Same entity ID, now backed by the new entry and showing live data.
     assert hass.states.get(entity_id).state == HOST
 
     device = dr.async_get(hass).async_get(device_id)
     assert device is not None
     assert device.config_entries == {entry.entry_id}
-    assert (DOMAIN, MAC) in device.identifiers
+    assert device.identifiers == {(DOMAIN, UNIQUE_ID)}
     assert (LEGACY_DOMAIN, MAC) not in device.identifiers
 
     await _unload_all(hass)

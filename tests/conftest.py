@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from copy import deepcopy
 import json
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
@@ -21,6 +21,8 @@ from custom_components.inkvision.const import DOMAIN
 HOST = "192.168.1.50"
 BASE_URL = f"http://{HOST}"
 MAC = "AA:BB:CC:DD:EE:FF"
+# The config entry unique ID and device identifier: the MAC as format_mac() gives it.
+UNIQUE_ID = "aa:bb:cc:dd:ee:ff"
 
 INFO_PAYLOAD: dict[str, Any] = {
     "name": "Atmos Smart Clock",
@@ -91,14 +93,26 @@ def mock_setup_entry() -> Generator[AsyncMock]:
 
 
 @pytest.fixture
+def entity_registry_enabled_by_default() -> Generator[None]:
+    """Create entities that are disabled by default as enabled."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        new_callable=PropertyMock,
+        return_value=True,
+    ):
+        yield
+
+
+@pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
     """Return an inkVision config entry."""
     return MockConfigEntry(
         domain=DOMAIN,
         title="Atmos Smart Clock",
         data={CONF_HOST: HOST},
-        unique_id=MAC,
+        unique_id=UNIQUE_ID,
         version=3,
+        minor_version=2,
     )
 
 

@@ -1,0 +1,113 @@
+{
+  "entity": {
+    "event": {
+      "button": {
+        "default": "mdi:gesture-tap-button"
+      }
+    },
+    "number": {
+      "brightness": {
+        "default": "mdi:brightness-6"
+      }
+    },
+    "select": {
+      "timezone": {
+        "default": "mdi:map-clock-outline"
+      },
+      "button_tap_action": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "button_long_press_action": {
+        "default": "mdi:gesture-tap-hold"
+      }
+    },
+    "sensor": {
+      "indoor_air_quality": {
+        "default": "mdi:air-filter"
+      },
+      "iaq_accuracy": {
+        "default": "mdi:tune-vertical"
+      },
+      "static_iaq": {
+        "default": "mdi:air-filter"
+      },
+      "iaq_rating": {
+        "default": "mdi:air-purifier"
+      },
+      "gas_resistance": {
+        "default": "mdi:omega"
+      },
+      "reported_brightness": {
+        "default": "mdi:brightness-6"
+      },
+      "ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "mac_address": {
+        "default": "mdi:network-outline"
+      },
+      "firmware_version": {
+        "default": "mdi:chip"
+      },
+      "firmware_id": {
+        "default": "mdi:chip"
+      },
+      "latest_firmware_id": {
+        "default": "mdi:chip"
+      },
+      "latest_firmware_version": {
+        "default": "mdi:chip"
+      }
+    },
+    "switch": {
+      "screen_clock": {
+        "default": "mdi:clock-outline"
+      },
+      "screen_temp": {
+        "default": "mdi:thermometer"
+      },
+      "screen_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "screen_pressure": {
+        "default": "mdi:gauge"
+      },
+      "screen_gas": {
+        "default": "mdi:molecule"
+      },
+      "screen_iaq": {
+        "default": "mdi:air-filter"
+      }
+    },
+    "text": {
+      "custom_message": {
+        "default": "mdi:message-text-outline"
+      }
+    },
+    "button": {
+      "firmware_check": {
+        "default": "mdi:update"
+      }
+    }
+  },
+  "services": {
+    "set_brightness": {
+      "service": "mdi:brightness-6"
+    },
+    "display_text": {
+      "service": "mdi:message-text-outline"
+    },
+    "restart_device": {
+      "service": "mdi:restart"
+    },
+    "set_screen_rotation": {
+      "service": "mdi:monitor-shimmer"
+    },
+    "set_timezone": {
+      "service": "mdi:map-clock-outline"
+    },
+    "set_custom_screen": {
+      "service": "mdi:text-box-edit-outline"
+    }
+  }
+}

@@ -56,8 +56,48 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "firmware_update_available": {
+        "name": "Firmware update available"
+      }
+    },
+    "button": {
+      "firmware_check": {
+        "name": "Check firmware update"
+      },
+      "firmware_update": {
+        "name": "Install firmware update"
+      }
+    },
+    "event": {
+      "button": {
+        "name": "Button {number}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "single_tap": "Single tap",
+              "long_press": "Long press"
+            }
+          }
+        }
+      }
+    },
+    "media_player": {
+      "speaker": {
+        "name": "Speaker"
+      }
+    },
+    "number": {
+      "brightness": {
+        "name": "Display brightness"
+      }
+    },
     "select": {
-      "button_action": {
+      "timezone": {
+        "name": "Timezone"
+      },
+      "button_tap_action": {
+        "name": "Button {number} tap action",
         "state": {
           "none": "None (Home Assistant only)",
           "brightness_up": "Brightness up",
@@ -66,6 +106,92 @@
           "prev_screen": "Previous screen",
           "toggle_screen": "Screen on/off"
         }
+      },
+      "button_long_press_action": {
+        "name": "Button {number} long press action",
+        "state": {
+          "none": "None (Home Assistant only)",
+          "brightness_up": "Brightness up",
+          "brightness_down": "Brightness down",
+          "next_screen": "Next screen",
+          "prev_screen": "Previous screen",
+          "toggle_screen": "Screen on/off"
+        }
+      }
+    },
+    "sensor": {
+      "wifi_signal": {
+        "name": "Wi-Fi signal"
+      },
+      "gas_resistance": {
+        "name": "Gas resistance"
+      },
+      "uptime": {
+        "name": "Uptime"
+      },
+      "reported_brightness": {
+        "name": "Reported brightness"
+      },
+      "ip_address": {
+        "name": "IP address"
+      },
+      "mac_address": {
+        "name": "MAC address"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "firmware_id": {
+        "name": "Firmware ID"
+      },
+      "latest_firmware_id": {
+        "name": "Latest firmware ID"
+      },
+      "latest_firmware_version": {
+        "name": "Latest firmware version"
+      },
+      "indoor_air_quality": {
+        "name": "Indoor air quality"
+      },
+      "iaq_accuracy": {
+        "name": "IAQ accuracy"
+      },
+      "static_iaq": {
+        "name": "Static IAQ"
+      },
+      "co2_equivalent": {
+        "name": "CO₂ equivalent"
+      },
+      "breath_voc": {
+        "name": "Breath VOC"
+      },
+      "iaq_rating": {
+        "name": "IAQ rating"
+      }
+    },
+    "switch": {
+      "screen_clock": {
+        "name": "Clock screen"
+      },
+      "screen_temp": {
+        "name": "Temperature screen"
+      },
+      "screen_humidity": {
+        "name": "Humidity screen"
+      },
+      "screen_pressure": {
+        "name": "Pressure screen"
+      },
+      "screen_gas": {
+        "name": "Gas screen"
+      },
+      "screen_iaq": {
+        "name": "Air quality screen"
+      }
+    },
+    "text": {
+      "custom_message": {
+        "name": "Custom message"
       }
     }
   },
@@ -92,6 +218,10 @@
     "deprecated_action": {
       "title": "The {action} action is deprecated",
       "description": "An automation or script called `{action}`. It still works for now, but it will be removed in a future release. Use the `{replacement}` action on the device's {entity} entity instead, then ignore this notice."
+    },
+    "deprecated_entity": {
+      "title": "An inkVision firmware entity is deprecated",
+      "description": "`{entity}` is replaced by the device's Firmware update entity and will be removed in a future release. It is still used by:\n\n{users}\n\nChange these to use the update entity with the `{replacement}` action, then disable or delete `{entity}` under **Settings** > **Devices & services** > **Entities**."
     }
   },
   "exceptions": {
@@ -181,7 +311,7 @@
     },
     "restart_device": {
       "name": "Restart device",
-      "description": "Restarts the device.",
+      "description": "Restarts the device. Deprecated: use the device's Restart entity instead.",
       "fields": {
         "device_id": {
           "name": "Device",

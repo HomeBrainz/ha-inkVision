@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - fallback for older HA cores
     from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
 from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN, LEGACY_DOMAIN
+from .coordinator import normalize_mac
 from .legacy_migration import CONF_MIGRATE_FROM
 
 _LOGGER = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
     return {
         "title": title,
         "host": host,
-        "mac_address": mac_address,
+        "mac_address": normalize_mac(str(mac_address)) or "",
     }
 
 
@@ -182,6 +183,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for inkVision."""
 
     VERSION = 3
+    MINOR_VERSION = 2
 
     _discovered: dict[str, Any]
 
@@ -206,7 +208,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Newer firmware advertises its MAC, so a known device is recognised
         # without contacting it. Older firmware is identified by the probe below.
         properties = discovery_info.properties or {}
-        if mac := _decode_discovery_value(properties.get("mac") or properties.get(b"mac")):
+        if mac := normalize_mac(_decode_discovery_value(properties.get("mac") or properties.get(b"mac"))):
             await self.async_set_unique_id(mac)
             self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 

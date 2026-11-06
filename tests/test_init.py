@@ -25,6 +25,7 @@ from .conftest import (
     BASE_URL,
     HOST,
     MAC,
+    UNIQUE_ID,
     STATUS_PAYLOAD,
     FakeWebSocketFactory,
     mock_device_http,
@@ -45,14 +46,14 @@ def _coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> InkVisionDataUp
 
 
 def _device_id(hass: HomeAssistant) -> str:
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MAC)})
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, UNIQUE_ID)})
     assert device is not None
     return device.id
 
 
 def _state(hass: HomeAssistant, platform: str, entry: MockConfigEntry, suffix: str):
     entity_id = er.async_get(hass).async_get_entity_id(
-        platform, DOMAIN, f"{entry.entry_id}_{suffix}"
+        platform, DOMAIN, f"{entry.unique_id}_{suffix}"
     )
     assert entity_id is not None
     return hass.states.get(entity_id)
@@ -75,7 +76,7 @@ async def test_setup_and_unload(
     # Firmware reports custom screen slots, so every slot is (re)sent on connect.
     assert commands[2:] == ["set_custom_screen"] * 4
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MAC)})
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, UNIQUE_ID)})
     assert device is not None
     assert device.name == "Atmos Smart Clock"
     assert device.sw_version == "1.2.3"
@@ -112,7 +113,7 @@ async def test_services_route_to_their_device(
     ):
         aioclient_mock.get(f"http://{second_host}/{path}", json=payload)
     second = MockConfigEntry(
-        domain=DOMAIN, data={CONF_HOST: second_host}, unique_id="11:22:33:44:55:66", version=3
+        domain=DOMAIN, data={CONF_HOST: second_host}, unique_id="11:22:33:44:55:66", version=3, minor_version=2
     )
     second.add_to_hass(hass)
     assert await hass.config_entries.async_setup(second.entry_id)
@@ -252,6 +253,47 @@ async def test_migrate_entry_noop_without_deprecated_entities(hass: HomeAssistan
         assert await hass.config_entries.async_setup(entry.entry_id)
 
     assert entry.version == 3
+
+
+async def test_migrate_entry_keys_by_mac(hass: HomeAssistant) -> None:
+    """Test 3.1 entries move entity unique IDs and the device identifier to the MAC."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=MAC, version=3)
+    entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, MAC)}
+    )
+    temperature = er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_temperature", config_entry=entry
+    )
+
+    with patch("custom_components.inkvision.async_setup_entry", return_value=True):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+
+    assert (entry.version, entry.minor_version) == (3, 2)
+    assert entry.unique_id == UNIQUE_ID
+    migrated = er.async_get(hass).async_get(temperature.entity_id)
+    assert migrated.unique_id == f"{UNIQUE_ID}_temperature"
+    assert dr.async_get(hass).async_get(device.id).identifiers == {(DOMAIN, UNIQUE_ID)}
+
+
+async def test_migrate_entry_without_mac_keeps_entry_id(hass: HomeAssistant) -> None:
+    """Test entries keyed by host keep entry ID unique IDs and key the device by entry ID."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=HOST, version=3)
+    entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, HOST)}
+    )
+    temperature = er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_temperature", config_entry=entry
+    )
+
+    with patch("custom_components.inkvision.async_setup_entry", return_value=True):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+
+    assert entry.minor_version == 2
+    assert entry.unique_id == HOST
+    assert er.async_get(hass).async_get(temperature.entity_id).unique_id == temperature.unique_id
+    assert dr.async_get(hass).async_get(device.id).identifiers == {(DOMAIN, entry.entry_id)}
 
 
 async def test_websocket_sensor_update(
@@ -655,8 +697,9 @@ async def test_custom_screen_templates(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_HOST: HOST},
-        unique_id=MAC,
+        unique_id=UNIQUE_ID,
         version=3,
+        minor_version=2,
         options={
             "custom_screen_1": "{{ states('sensor.outdoor_temperature') }}°C",
             "custom_screen_2": "  ",

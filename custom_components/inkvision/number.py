@@ -30,8 +30,7 @@ async def async_setup_entry(
 class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
     """Number entity to control display brightness."""
 
-    _attr_name = "Display Brightness"
-    _attr_icon = "mdi:brightness-6"
+    _attr_translation_key = "brightness"
     _attr_native_min_value = 0
     _attr_native_max_value = 15
     _attr_native_step = 1
@@ -45,7 +44,7 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
         super().__init__(coordinator)
         self.config_entry = config_entry
         self._host = config_entry.data["host"]
-        self._attr_unique_id = f"{config_entry.entry_id}_brightness_level"
+        self._attr_unique_id = f"{coordinator.device_key}_brightness_level"
 
     @property
     def native_value(self) -> int | None:

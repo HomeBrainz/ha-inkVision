@@ -25,7 +25,7 @@ from custom_components.inkvision.config_flow import (
 )
 from custom_components.inkvision.const import DOMAIN
 
-from .conftest import BASE_URL, HOST, INFO_PAYLOAD, MAC
+from .conftest import BASE_URL, HOST, INFO_PAYLOAD, MAC, UNIQUE_ID
 
 pytestmark = pytest.mark.usefixtures("mock_setup_entry")
 
@@ -76,7 +76,7 @@ async def test_user_flow(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Atmos Smart Clock"
     assert result["data"] == {CONF_HOST: HOST}
-    assert result["result"].unique_id == MAC
+    assert result["result"].unique_id == UNIQUE_ID
     assert len(mock_setup_entry.mock_calls) == 1
 
 
@@ -132,7 +132,7 @@ async def test_user_flow_falls_back_to_status_endpoint(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "HomeBrainz Clock"
-    assert result["result"].unique_id == MAC
+    assert result["result"].unique_id == UNIQUE_ID
     assert aioclient_mock.call_count == 2
 
 
@@ -170,7 +170,7 @@ async def test_user_flow_errors(
     result = await hass.config_entries.flow.async_configure(flow_id, {CONF_HOST: HOST})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == MAC
+    assert result["result"].unique_id == UNIQUE_ID
 
 
 async def test_user_flow_non_homebrainz_wins_over_connection_error(
@@ -273,7 +273,7 @@ async def test_zeroconf_flow(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Atmos Smart Clock"
     assert result["data"] == {CONF_HOST: HOST}
-    assert result["result"].unique_id == MAC
+    assert result["result"].unique_id == UNIQUE_ID
     assert len(mock_setup_entry.mock_calls) == 1
 
 
@@ -391,7 +391,7 @@ async def test_zeroconf_flow_new_mac_probes_and_confirms(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == MAC
+    assert result["result"].unique_id == UNIQUE_ID
 
 
 async def test_zeroconf_flow_without_mac_uses_host_as_unique_id(
@@ -444,8 +444,9 @@ async def test_options_flow_suggests_current_templates(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_HOST: HOST},
-        unique_id=MAC,
+        unique_id=UNIQUE_ID,
         version=3,
+        minor_version=2,
         options={"custom_screen_2": "{{ now().hour }}"},
     )
     entry.add_to_hass(hass)
@@ -597,7 +598,7 @@ async def test_reconfigure_flow_without_mac(
     mock_setup_entry: AsyncMock,
 ) -> None:
     """Test firmware without a MAC (entry keyed by host) can still move to a new host."""
-    entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=HOST, version=3)
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOST: HOST}, unique_id=HOST, version=3, minor_version=2)
     entry.add_to_hass(hass)
     new_host = "192.168.1.77"
     aioclient_mock.get(f"http://{new_host}/api/info", json={"model": "Bento Bar"})

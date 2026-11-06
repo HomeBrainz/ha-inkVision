@@ -36,6 +36,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN, LEGACY_DOMAIN
+from .coordinator import device_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -155,8 +156,8 @@ async def async_take_over_legacy_entry(hass: HomeAssistant, entry: ConfigEntry) 
                 entity.entity_id,
                 DOMAIN,
                 new_config_entry_id=entry.entry_id,
-                # Unique IDs start with the config entry ID.
-                new_unique_id=entity.unique_id.replace(old_id, entry.entry_id, 1),
+                # Unique IDs start with the old config entry ID.
+                new_unique_id=entity.unique_id.replace(old_id, device_key(entry), 1),
             )
 
         device_registry = dr.async_get(hass)
@@ -167,9 +168,9 @@ async def async_take_over_legacy_entry(hass: HomeAssistant, entry: ConfigEntry) 
                 device.id,
                 add_config_entry_id=entry.entry_id,
                 new_identifiers={
-                    (DOMAIN if domain == LEGACY_DOMAIN else domain, value)
-                    for domain, value in device.identifiers
-                },
+                    (domain, value) for domain, value in device.identifiers if domain != LEGACY_DOMAIN
+                }
+                | {(DOMAIN, device_key(entry))},
             )
             device_registry.async_update_device(device.id, remove_config_entry_id=old_id)
 

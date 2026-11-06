@@ -24,6 +24,12 @@ from homeassistant.components.select import (
     SERVICE_SELECT_OPTION,
 )
 from homeassistant.components.text import DOMAIN as TEXT_DOMAIN, SERVICE_SET_VALUE as TEXT_SET_VALUE
+from homeassistant.components.update import (
+    ATTR_INSTALLED_VERSION,
+    ATTR_LATEST_VERSION,
+    DOMAIN as UPDATE_DOMAIN,
+    SERVICE_INSTALL,
+)
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     SERVICE_MEDIA_PAUSE,
@@ -40,18 +46,20 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.inkvision.const import DOMAIN
 
-from .conftest import BASE_URL, HOST, FakeWebSocketFactory
+from .conftest import BASE_URL, HOST, UNIQUE_ID, FakeWebSocketFactory, mock_device_http
 
 
 def _entity_id(hass: HomeAssistant, platform: str, entry: MockConfigEntry, suffix: str) -> str:
     entity_id = er.async_get(hass).async_get_entity_id(
-        platform, DOMAIN, f"{entry.entry_id}_{suffix}"
+        platform, DOMAIN, f"{entry.unique_id}_{suffix}"
     )
     assert entity_id is not None, suffix
     return entity_id
@@ -77,15 +85,16 @@ async def test_entities_created(
         "number": 1,
         "select": 5,
         "switch": 6,
-        "binary_sensor": 1,
-        "button": 2,
+        "button": 1,
         "event": 2,
         "media_player": 1,
         "text": 1,
+        "update": 1,
     }
     assert len({entity.device_id for entity in entries}) == 1
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_sensor_states(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -133,8 +142,153 @@ async def test_sensor_states(
     assert _state(hass, "sensor", entry, "temperature").state == STATE_UNKNOWN
 
 
-async def test_firmware_update_binary_sensor(
+async def test_noisy_diagnostics_disabled_by_default(
     hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test IP, MAC, uptime and firmware detail sensors start disabled."""
+    registry = er.async_get(hass)
+    for suffix in ("ip_address", "mac_address", "uptime", "firmware_id", "firmware_version"):
+        entity = registry.async_get(_entity_id(hass, "sensor", init_integration, suffix))
+        assert entity.disabled_by is er.RegistryEntryDisabler.INTEGRATION, suffix
+
+
+async def test_entity_names(hass: HomeAssistant, init_integration: MockConfigEntry) -> None:
+    """Test entities are named after the device plus a translated name."""
+    names = {
+        ("sensor", "temperature"): "Atmos Smart Clock Temperature",
+        ("sensor", "wifi_signal"): "Atmos Smart Clock Wi-Fi signal",
+        ("number", "brightness_level"): "Atmos Smart Clock Display brightness",
+        ("switch", "screen_iaq"): "Atmos Smart Clock Air quality screen",
+        ("select", "button2_longPress_action"): "Atmos Smart Clock Button 2 long press action",
+        ("event", "button_1_event"): "Atmos Smart Clock Button 1",
+        ("button", "restart"): "Atmos Smart Clock Restart",
+        ("update", "firmware"): "Atmos Smart Clock Firmware",
+    }
+    for (platform, suffix), name in names.items():
+        assert _state(hass, platform, init_integration, suffix).name == name
+
+
+async def test_restart_button(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_websocket: FakeWebSocketFactory,
+) -> None:
+    """Test the restart button sends the restart command."""
+    restart = _entity_id(hass, "button", init_integration, "restart")
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: restart}, blocking=True
+    )
+    assert mock_websocket.current.sent[-1] == {"command": "restart"}
+
+
+async def test_firmware_update_entity(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """Test the firmware update entity checks, describes and installs updates."""
+    entity_id = _entity_id(hass, "update", init_integration, "firmware")
+    state = hass.states.get(entity_id)
+    assert state.state == STATE_OFF
+    assert state.attributes[ATTR_INSTALLED_VERSION] == "1.2.3"
+    assert state.attributes[ATTR_LATEST_VERSION] == "1.2.3"
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{BASE_URL}/api/ota/check",
+        json={
+            "updateAvailable": True,
+            "currentVersion": "1.2.3",
+            # Same version string, newer build: the device's flag decides.
+            "latestVersion": "1.2.3",
+            "latestFirmwareId": 6,
+            "downloadUrl": "http://fw/bin",
+            "releaseNotes": "Fixes",
+        },
+    )
+    await async_setup_component(hass, "homeassistant", {})
+    await hass.services.async_call(
+        "homeassistant", "update_entity", {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    state = hass.states.get(entity_id)
+    assert state.state == STATE_ON
+    assert state.attributes[ATTR_LATEST_VERSION] == "1.2.3 (build 6)"
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "update/release_notes", "entity_id": entity_id})
+    assert (await client.receive_json())["result"] == "Fixes"
+
+    aioclient_mock.post(f"{BASE_URL}/api/ota/update", json={})
+    await hass.services.async_call(
+        UPDATE_DOMAIN, SERVICE_INSTALL, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    assert aioclient_mock.mock_calls[-1][2] == {"url": "http://fw/bin", "confirm": True}
+
+
+@pytest.fixture
+def legacy_firmware_entities(hass: HomeAssistant) -> dict[str, str]:
+    """Register the firmware entities the update entity replaces, as an existing install has them."""
+    registry = er.async_get(hass)
+    entities = {
+        suffix: registry.async_get_or_create(platform, DOMAIN, f"{UNIQUE_ID}_{suffix}").entity_id
+        for platform, suffix in (
+            ("binary_sensor", "firmware_update_available"),
+            ("button", "firmware_check"),
+            ("button", "firmware_update"),
+        )
+    }
+    return entities
+
+
+async def test_deprecated_firmware_entities(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    mock_websocket: FakeWebSocketFactory,
+    legacy_firmware_entities: dict[str, str],
+) -> None:
+    """Test old firmware entities stay for existing installs and repairs flag their users."""
+    registry = er.async_get(hass)
+    check = legacy_firmware_entities["firmware_check"]
+    registry.async_update_entity(check, disabled_by=er.RegistryEntryDisabler.USER)
+    available = legacy_firmware_entities["firmware_update_available"]
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": {
+                "alias": "Firmware alert",
+                "trigger": {"platform": "state", "entity_id": available},
+                "action": [],
+            }
+        },
+    )
+    mock_device_http(aioclient_mock)
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(available) is not None
+    assert hass.states.get(legacy_firmware_entities["firmware_update"]) is not None
+    assert registry.async_get(check) is None
+
+    issues = ir.async_get(hass)
+    issue = issues.async_get_issue(DOMAIN, f"deprecated_entity_{available}")
+    assert issue is not None
+    assert issue.translation_placeholders["users"] == "- automation.firmware_alert"
+    assert (
+        issues.async_get_issue(DOMAIN, f"deprecated_entity_{legacy_firmware_entities['firmware_update']}")
+        is None
+    )
+
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+
+
+async def test_firmware_update_binary_sensor(
+    hass: HomeAssistant,
+    legacy_firmware_entities: dict[str, str],
+    init_integration: MockConfigEntry,
 ) -> None:
     """Test the update-available binary sensor and its OTA attributes."""
     state = _state(hass, "binary_sensor", init_integration, "firmware_update_available")
@@ -340,6 +494,7 @@ async def test_button_events(
 
 async def test_firmware_buttons(
     hass: HomeAssistant,
+    legacy_firmware_entities: dict[str, str],
     init_integration: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:

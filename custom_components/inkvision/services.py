@@ -36,6 +36,7 @@ DEPRECATED_ACTIONS = {
     SERVICE_SET_BRIGHTNESS: ("number.set_value", "Display brightness"),
     SERVICE_DISPLAY_TEXT: ("text.set_value", "Custom message"),
     SERVICE_SET_TIMEZONE: ("select.select_option", "Timezone"),
+    SERVICE_RESTART_DEVICE: ("button.press", "Restart"),
 }
 
 BRIGHTNESS_SCHEMA = vol.Schema({
