@@ -77,10 +77,11 @@ rules:
   config-entry-unloading:
     status: done
   docs-configuration-parameters:
-    status: todo
-    comment: Document the custom screen templates in the options flow.
+    status: done
+    comment: README "Options" documents the four custom screen templates.
   docs-installation-parameters:
-    status: todo
+    status: done
+    comment: README "Adding a device" documents the host.
   entity-unavailable:
     status: done
     comment: Coordinator entities go unavailable when polling fails; a dropped WebSocket triggers an immediate poll.
@@ -119,19 +120,26 @@ rules:
     status: done
     comment: Rediscovery updates the host of the existing entry.
   docs-data-update:
-    status: todo
+    status: done
+    comment: README "Data updates": WebSocket push, 5-minute poll, reconnect timing.
   docs-examples:
-    status: todo
+    status: done
+    comment: README "Examples": air quality, button, custom screen, brightness and speaker automations.
   docs-known-limitations:
-    status: todo
+    status: done
+    comment: README "Known limitations".
   docs-supported-devices:
-    status: todo
+    status: done
+    comment: README "Supported devices": Atmos Smart Clock only.
   docs-supported-functions:
-    status: todo
+    status: done
+    comment: README "Supported functionality" lists every entity and action.
   docs-troubleshooting:
-    status: todo
+    status: done
+    comment: README "Troubleshooting", with the error texts of the config flow and debug logging.
   docs-use-cases:
-    status: todo
+    status: done
+    comment: README "Use cases".
   dynamic-devices:
     status: exempt
     comment: Each config entry is a single device.
