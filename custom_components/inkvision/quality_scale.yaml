@@ -21,8 +21,8 @@ rules:
     status: done
     comment: >-
       User, zeroconf (with a discovery_confirm step) and reconfigure steps; the host field has a
-      data_description. The firmware advertises no MAC in its mDNS TXT records, so zeroconf has to
-      probe the device over HTTP before it can set the unique ID.
+      data_description. Firmware that advertises a `mac` TXT record is matched to its entry before
+      any network call; older firmware is probed over HTTP first.
   config-flow-test-coverage:
     status: done
     comment: tests/test_config_flow.py covers config_flow.py at 100%.

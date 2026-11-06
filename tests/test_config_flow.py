@@ -355,6 +355,45 @@ async def test_zeroconf_flow_updates_host_of_configured_device(
     assert mock_config_entry.data[CONF_HOST] == new_host
 
 
+@pytest.mark.parametrize("properties", [{"mac": MAC}, {b"mac": MAC.encode()}], ids=["str", "bytes"])
+async def test_zeroconf_flow_known_mac_skips_probe(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    properties: dict[Any, Any],
+) -> None:
+    """Test a configured device advertising its MAC is recognised without contacting it."""
+    mock_config_entry.add_to_hass(hass)
+    new_host = "192.168.1.77"
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_ZEROCONF},
+        data=_zeroconf_info(host=new_host, properties=properties),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert mock_config_entry.data[CONF_HOST] == new_host
+    assert aioclient_mock.call_count == 0
+
+
+async def test_zeroconf_flow_new_mac_probes_and_confirms(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a new device advertising its MAC is still probed and confirmed."""
+    aioclient_mock.get(f"{BASE_URL}/api/info", json=INFO_PAYLOAD)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=_zeroconf_info(properties={"mac": MAC})
+    )
+    assert result["step_id"] == "discovery_confirm"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == MAC
+
+
 async def test_zeroconf_flow_without_mac_uses_host_as_unique_id(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:

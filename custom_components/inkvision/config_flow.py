@@ -203,6 +203,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not host:
             return self.async_abort(reason="cannot_connect")
 
+        # Newer firmware advertises its MAC, so a known device is recognised
+        # without contacting it. Older firmware is identified by the probe below.
+        properties = discovery_info.properties or {}
+        if mac := _decode_discovery_value(properties.get("mac") or properties.get(b"mac")):
+            await self.async_set_unique_id(mac)
+            self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+
         try:
             info = await validate_input(self.hass, {CONF_HOST: host})
         except CannotConnect:
