@@ -1,11 +1,10 @@
 """Config flow for inkVision integration."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
-import aiohttp
+from pyinkvision import InkVisionClient, InkVisionConnectionError, InkVisionResponseError
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
@@ -26,11 +25,6 @@ from .coordinator import normalize_mac
 from .legacy_migration import CONF_MIGRATE_FROM
 
 _LOGGER = logging.getLogger(__name__)
-
-DISCOVERY_ENDPOINTS: tuple[str, ...] = (
-    "/api/info",
-    "/status",
-)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -81,11 +75,8 @@ def _is_inkvision_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
     )
 
 
-def _extract_device_info(payload: Any, host: str) -> dict[str, Any] | None:
+def _extract_device_info(payload: dict[str, Any], host: str) -> dict[str, Any] | None:
     """Normalize device info returned by different inkVision firmware APIs."""
-    if not isinstance(payload, dict):
-        return None
-
     mac_address = (
         payload.get("mac_address")
         or payload.get("macAddress")
@@ -141,34 +132,29 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
     host = normalize_host(data[CONF_HOST])
-    session = async_get_clientsession(hass)
+    client = InkVisionClient(host, async_get_clientsession(hass))
 
     last_error: Exception | None = None
     received_non_inkvision_response = False
 
-    for endpoint in DISCOVERY_ENDPOINTS:
+    # Newer firmware answers /api/info; the Atmos Smart Clock only /status.
+    for fetch in (client.get_info, client.get_status):
         try:
-            async with asyncio.timeout(10):
-                async with session.get(f"http://{host}{endpoint}") as response:
-                    if response.status != 200:
-                        continue
+            payload = await fetch()
+        except InkVisionResponseError as err:
+            if err.status == 200:
+                # Something answered, but not with an inkVision reply.
+                received_non_inkvision_response = True
+            continue
+        except InkVisionConnectionError as err:
+            last_error = err
+            continue
 
-                    payload = await response.json()
+        info = _extract_device_info(payload, host)
+        if info is not None:
+            return info
 
-            info = _extract_device_info(payload, host)
-            if info is not None:
-                return info
-
-            received_non_inkvision_response = True
-        except aiohttp.ClientError as err:
-            last_error = err
-        except (asyncio.TimeoutError, TimeoutError) as err:
-            last_error = err
-        except ValueError as err:
-            last_error = err
-        except Exception as err:  # pragma: no cover - defensive logging
-            _LOGGER.debug("Unexpected validation error for %s%s: %s", host, endpoint, err)
-            last_error = err
+        received_non_inkvision_response = True
 
     if received_non_inkvision_response:
         raise InvalidDevice

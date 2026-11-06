@@ -16,7 +16,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-from websockets.exceptions import ConnectionClosedError
+
+from pyinkvision import InkVisionConnectionError
 
 from custom_components.inkvision.coordinator import InkVisionDataUpdateCoordinator
 from custom_components.inkvision.const import DOMAIN
@@ -382,15 +383,15 @@ async def test_websocket_ping_and_bad_messages(
     mock_websocket: FakeWebSocketFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test ping replies and that malformed messages don't kill the connection."""
+    """Test ping replies and that malformed messages don't kill the connection.
+
+    Invalid JSON never reaches the coordinator; pyinkvision drops it.
+    """
     websocket = mock_websocket.current
     websocket.send.reset_mock()
 
     await websocket.push({"type": "ping", "timestamp": 42})
     assert websocket.sent == [{"type": "pong", "timestamp": 42}]
-
-    await websocket.push("{not json")
-    assert "Received invalid JSON" in caplog.text
 
     await websocket.push(["a", "list"])
     assert "Error processing WebSocket message" in caplog.text
@@ -413,7 +414,7 @@ async def test_websocket_reconnects(
     mock_websocket.side_effects.append(OSError("unreachable"))
 
     with patch("custom_components.inkvision.coordinator.WEBSOCKET_RETRY_DELAY", 0):
-        await first.messages.put(ConnectionClosedError(None, None))
+        await first.messages.put(InkVisionConnectionError("closed"))
         second = await mock_websocket.wait_listening()
         await hass.async_block_till_done()
 
@@ -453,12 +454,12 @@ async def test_send_skipped_when_disconnected_or_closed(
     websocket = mock_websocket.current
     websocket.send.reset_mock()
 
-    websocket.closed = lambda: True
+    websocket.closed = True
     assert await coordinator.send_device_command("restart") is True
     websocket.send.assert_not_awaited()
 
     websocket.closed = False
-    websocket.send.side_effect = OSError("broken pipe")
+    websocket.send.side_effect = InkVisionConnectionError("broken pipe")
     assert await coordinator.send_device_command("restart") is True
     assert coordinator._websocket is None
 

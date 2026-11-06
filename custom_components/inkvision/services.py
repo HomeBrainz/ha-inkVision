@@ -1,10 +1,9 @@
 """Actions (services) for inkVision."""
 from __future__ import annotations
 
-import asyncio
 import logging
 
-import aiohttp
+from pyinkvision import InkVisionConnectionError, InkVisionResponseError
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntryState
@@ -53,17 +52,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_screens")
 
         try:
-            async with asyncio.timeout(10):
-                async with coordinator.session.post(
-                    f"http://{coordinator.host}/display/screens",
-                    json={"screens": screens},
-                ) as response:
-                    if response.status != 200:
-                        raise coordinator.error("device_rejected", status=str(response.status))
-        except aiohttp.ClientError as err:
+            await coordinator.client.set_screens(screens)
+        except InkVisionResponseError as err:
+            raise coordinator.error("device_rejected", status=str(err.status)) from err
+        except InkVisionConnectionError as err:
             raise coordinator.error("communication_error", error=str(err)) from err
-        except asyncio.TimeoutError as err:
-            raise coordinator.error("communication_error", error="timeout") from err
         _LOGGER.info("Updated screen rotation for device %s", device_id)
 
     async def set_custom_screen_service(call: ServiceCall) -> None:

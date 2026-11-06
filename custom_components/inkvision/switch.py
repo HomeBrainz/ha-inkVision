@@ -1,11 +1,10 @@
 """Switch platform for inkVision integration."""
 from __future__ import annotations
 
-import asyncio
 from copy import deepcopy
 import logging
 
-import aiohttp
+from pyinkvision import InkVisionConnectionError, InkVisionResponseError
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -117,15 +116,12 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
             return
 
         try:
-            async with asyncio.timeout(10):
-                async with self.coordinator.session.post(
-                    f"http://{self.coordinator.host}/display/screens",
-                    json={"screens": new_screens},
-                ) as response:
-                    if response.status != 200:
-                        raise self.coordinator.error("device_rejected", status=str(response.status))
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise self.coordinator.error("communication_error", error=str(err) or "timeout") from err
+            await self.coordinator.client.set_screens(new_screens)
+        except InkVisionResponseError as err:
+            raise self.coordinator.error("device_rejected", status=str(err.status)) from err
+        except InkVisionConnectionError as err:
+            raise self.coordinator.error("communication_error", error=str(err)) from err
+
 
         existing = self.coordinator.data or {"sensors": {}, "status": {}, "screens": []}
         new_data = deepcopy(existing)

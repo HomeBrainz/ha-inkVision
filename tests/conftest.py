@@ -132,7 +132,7 @@ def mock_device_http(
 
 
 class FakeWebSocket:
-    """Stand-in for a websockets client connection.
+    """Stand-in for a pyinkvision InkVisionWebSocket.
 
     Messages pushed with ``push`` are handed to the coordinator's ``async for``
     loop; ``push`` returns once the coordinator has processed the message.
@@ -151,18 +151,25 @@ class FakeWebSocket:
         self.listening.set()
         return self
 
-    async def __anext__(self) -> str:
-        if self._pending:
-            # The coordinator is back for the next message, so the last one is handled.
-            self._pending = False
-            self.messages.task_done()
-        item = await self.messages.get()
-        self._pending = True
-        if isinstance(item, BaseException):
-            self._pending = False
-            self.messages.task_done()
-            raise item
-        return item if isinstance(item, str) else json.dumps(item)
+    async def __anext__(self) -> dict[str, Any]:
+        while True:
+            if self._pending:
+                # The coordinator is back for the next message, so the last one is handled.
+                self._pending = False
+                self.messages.task_done()
+            item = await self.messages.get()
+            self._pending = True
+            if isinstance(item, BaseException):
+                self._pending = False
+                self.messages.task_done()
+                raise item
+            if isinstance(item, str):
+                # Like the library: decode text frames and skip invalid JSON.
+                try:
+                    item = json.loads(item)
+                except ValueError:
+                    continue
+            return item
 
     async def push(self, message: Any) -> None:
         """Deliver a message (dict, raw string or exception) and wait until handled."""
@@ -172,11 +179,11 @@ class FakeWebSocket:
     @property
     def sent(self) -> list[dict[str, Any]]:
         """Return the decoded commands the coordinator sent."""
-        return [json.loads(call.args[0]) for call in self.send.await_args_list]
+        return [call.args[0] for call in self.send.await_args_list]
 
 
 class FakeWebSocketFactory:
-    """Replacement for ``websockets.connect`` that hands out FakeWebSockets."""
+    """Replacement for ``InkVisionClient.websocket`` that hands out FakeWebSockets."""
 
     def __init__(self) -> None:
         self.sockets: list[FakeWebSocket] = []
@@ -189,8 +196,8 @@ class FakeWebSocketFactory:
         """Return the most recent connection."""
         return self.sockets[-1]
 
-    def __call__(self, url: str, **kwargs: Any):
-        self.urls.append(url)
+    def __call__(self, client: Any):
+        self.urls.append(f"ws://{client.host}/ws")
         return self._connect()
 
     @asynccontextmanager
@@ -214,7 +221,8 @@ class FakeWebSocketFactory:
 def mock_websocket() -> Generator[FakeWebSocketFactory]:
     """Patch the integration's WebSocket client."""
     factory = FakeWebSocketFactory()
-    with patch("custom_components.inkvision.coordinator.websockets.connect", factory):
+    # A function, so the patched method gets the client like the real one.
+    with patch("pyinkvision.InkVisionClient.websocket", lambda client: factory(client)):
         yield factory
 
 

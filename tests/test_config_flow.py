@@ -141,7 +141,7 @@ async def test_user_flow_falls_back_to_status_endpoint(
     [
         ({"exc": aiohttp.ClientError()}, "cannot_connect"),
         ({"exc": asyncio.TimeoutError()}, "cannot_connect"),
-        ({"text": "not json"}, "cannot_connect"),
+        ({"text": "not json"}, "invalid_device"),
         ({"status": 500}, "cannot_connect"),
         ({"json": {"device": "Shelly Plug", "mac": MAC}}, "invalid_device"),
         ({"json": ["not", "a", "dict"]}, "invalid_device"),

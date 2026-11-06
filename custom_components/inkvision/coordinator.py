@@ -4,13 +4,17 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from datetime import timedelta
-import json
 import logging
 import re
 
-import aiohttp
-import websockets
-from websockets.exceptions import ConnectionClosedError, WebSocketException
+from pyinkvision import (
+    InkVisionClient,
+    InkVisionConnectionError,
+    InkVisionError,
+    InkVisionResponseError,
+    InkVisionUnsupportedError,
+    InkVisionWebSocket,
+)
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -58,9 +62,8 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         host = config_entry.data["host"]
         self.host = host
         self.device_key = device_key(config_entry)
-        self.session = async_get_clientsession(hass)
-        self._websocket = None
-        self._websocket_url = f"ws://{host}/ws"
+        self.client = InkVisionClient(host, async_get_clientsession(hass))
+        self._websocket: InkVisionWebSocket | None = None
         self._retry_count = 0
         self._websocket_task = None
         self._websocket_connected = False
@@ -118,14 +121,9 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         """Handle WebSocket connection and messages."""
         while True:
             try:
-                _LOGGER.debug("Attempting to connect to WebSocket at %s", self._websocket_url)
-                
-                async with websockets.connect(
-                    self._websocket_url,
-                    ping_interval=15,
-                    ping_timeout=10,
-                    close_timeout=5
-                ) as websocket:
+                _LOGGER.debug("Attempting to connect to the WebSocket of %s", self.host)
+
+                async with self.client.websocket() as websocket:
                     self._websocket = websocket
                     self._websocket_connected = True
                     if self._retry_count:
@@ -133,23 +131,20 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                     else:
                         _LOGGER.debug("WebSocket connected to inkVision device at %s", self.host)
                     self._retry_count = 0
-                    
+
                     # Request initial data
                     await self._send_websocket_command({"command": "get_status"})
                     await self._send_websocket_command({"command": "get_sensors"})
                     await self._async_push_custom_screens()
-                    
-                    # Listen for messages
-                    async for message in websocket:
+
+                    # Listen for messages; ends with InkVisionConnectionError.
+                    async for data in websocket:
                         try:
-                            data = json.loads(message)
                             await self._handle_websocket_message(data)
-                        except json.JSONDecodeError:
-                            _LOGGER.warning("Received invalid JSON from WebSocket: %s", message)
                         except Exception as err:
                             _LOGGER.error("Error processing WebSocket message: %s", err)
-                            
-            except (WebSocketException, ConnectionClosedError, OSError) as err:
+
+            except InkVisionConnectionError as err:
                 was_connected = self._websocket_connected
                 self._websocket_connected = False
                 self._websocket = None
@@ -168,7 +163,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                     self.host, err, WEBSOCKET_RETRY_DELAY, WEBSOCKET_MAX_RETRY_DELAY,
                 )
                 await asyncio.sleep(delay)
-                    
+
             except asyncio.CancelledError:
                 _LOGGER.debug("WebSocket handler cancelled")
                 break
@@ -180,32 +175,17 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _send_websocket_command(self, command: dict):
         """Send a command to the WebSocket."""
-        if not self._websocket:
+        if not self._websocket or self._websocket.closed:
             _LOGGER.debug("Skipping send; WebSocket not connected: %s", command)
             return
 
-        websocket = self._websocket
-        is_closed = getattr(websocket, "closed", False)
-        # Some versions of the websockets library expose ``closed`` as an awaitable or callable
-        if callable(is_closed):
-            try:
-                is_closed = is_closed()
-            except Exception:  # pragma: no cover - defensive guard
-                is_closed = False
-
-        if is_closed:
-            _LOGGER.debug("Skipping send; WebSocket already closed: %s", command)
-            return
-
         try:
-            await websocket.send(json.dumps(command))
+            await self._websocket.send(command)
             _LOGGER.debug("Sent WebSocket command: %s", command)
-        except (WebSocketException, ConnectionClosedError, OSError) as err:
+        except InkVisionConnectionError as err:
             _LOGGER.warning("WebSocket send failed (%s); marking connection closed", err)
             self._websocket_connected = False
             self._websocket = None
-        except Exception as err:  # pragma: no cover - unexpected errors
-            _LOGGER.error("Error sending WebSocket command: %s", err)
 
     async def _handle_websocket_message(self, data: dict):
         """Handle incoming WebSocket message."""
@@ -381,16 +361,9 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
     async def async_set_button_action(self, button: str, gesture: str, action: str) -> bool:
         """Set what one gesture does on the device, e.g. ("button1", "longPress", "nextScreen")."""
         try:
-            async with asyncio.timeout(10):
-                async with self.session.post(
-                    f"http://{self.host}/buttons/actions",
-                    json={button: {gesture: action}},
-                ) as response:
-                    if response.status != 200:
-                        _LOGGER.error("Failed to set %s %s action: HTTP %s", button, gesture, response.status)
-                        return False
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("HTTP error setting %s %s action: %s", button, gesture, err)
+            await self.client.set_button_action(button, gesture, action)
+        except InkVisionError as err:
+            _LOGGER.error("Failed to set %s %s action: %s", button, gesture, err)
             return False
 
         self.button_actions.setdefault(button, {})[gesture] = action
@@ -434,14 +407,6 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
     async def async_speaker_command(self, action: str, **kwargs) -> bool:
         """Send a speaker command via HTTP first, then WebSocket fallback."""
         payload = {key: value for key, value in kwargs.items() if value is not None}
-        endpoint_by_action = {
-            "play": "/speaker/play",
-            "pause": "/speaker/pause",
-            "stop": "/speaker/stop",
-            "set_volume": "/speaker/volume",
-            "mute": "/speaker/mute",
-            "play_media": "/speaker/play",
-        }
         ws_command_by_action = {
             "play": "speaker_play",
             "pause": "speaker_pause",
@@ -451,88 +416,52 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
             "play_media": "speaker_play_media",
         }
 
-        endpoint = endpoint_by_action.get(action)
-        if endpoint:
-            try:
-                async with asyncio.timeout(10):
-                    async with self.session.post(
-                        f"http://{self.host}{endpoint}",
-                        json=payload,
-                    ) as response:
-                        if response.status == 200:
-                            try:
-                                data = await response.json()
-                            except Exception:
-                                return True
-
-                            if isinstance(data, dict) and data.get("success") is False:
-                                _LOGGER.error("Speaker command %s rejected: %s", action, data)
-                                return False
-                            return True
-
-                        if response.status not in (404, 405):
-                            _LOGGER.error(
-                                "Speaker command %s failed via HTTP: status %s",
-                                action,
-                                response.status,
-                            )
-                            return False
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                _LOGGER.debug("Speaker HTTP command failed for action %s", action, exc_info=True)
-
         ws_command = ws_command_by_action.get(action)
         if ws_command is None:
             _LOGGER.error("Unknown speaker action requested: %s", action)
             return False
+
+        try:
+            await self.client.speaker_command(action, **payload)
+        except (InkVisionUnsupportedError, InkVisionConnectionError) as err:
+            # Older firmware takes speaker commands only over the WebSocket.
+            _LOGGER.debug("Speaker HTTP command %s failed (%s); trying the WebSocket", action, err)
+        except InkVisionResponseError as err:
+            _LOGGER.error("Speaker command %s failed: %s", action, err)
+            return False
+        else:
+            return True
 
         return await self.send_device_command(ws_command, **payload)
 
     async def async_fetch_ota_status(self) -> dict:
         """Fetch OTA status via HTTP."""
         try:
-            async with asyncio.timeout(10):
-                async with self.session.get(f"http://{self.host}/api/ota/check") as response:
-                    if response.status == 200:
-                        ota_data = await response.json()
-                        return ota_data if isinstance(ota_data, dict) else {}
-                    _LOGGER.debug("OTA check failed with status %s", response.status)
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            _LOGGER.debug("OTA check HTTP error", exc_info=True)
+            return await self.client.get_ota_status()
+        except InkVisionError as err:
+            _LOGGER.debug("OTA check failed: %s", err)
         return {}
 
     async def async_fetch_config(self) -> dict:
         """Fetch device config via HTTP."""
         try:
-            async with asyncio.timeout(10):
-                async with self.session.get(f"http://{self.host}/config.json") as response:
-                    if response.status == 200:
-                        config_data = await response.json()
-                        return config_data if isinstance(config_data, dict) else {}
-                    _LOGGER.debug("Config fetch failed with status %s", response.status)
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            _LOGGER.debug("Config fetch HTTP error", exc_info=True)
+            return await self.client.get_config()
+        except InkVisionError as err:
+            _LOGGER.debug("Config fetch failed: %s", err)
         return {}
 
     async def async_set_timezone(self, timezone: str) -> bool:
         """Set timezone on the device via HTTP POST /config."""
         try:
-            async with asyncio.timeout(10):
-                async with self.session.post(
-                    f"http://{self.host}/config",
-                    data={"data": json.dumps({"timeZone": timezone})},
-                ) as response:
-                    if response.status == 200:
-                        # Optimistically update coordinator data
-                        existing = self.data or {}
-                        new_data = deepcopy(existing)
-                        config = new_data.setdefault("config", {})
-                        config["timeZone"] = timezone
-                        self.async_set_updated_data(new_data)
-                        return True
-                    _LOGGER.error("Failed to set timezone: HTTP %s", response.status)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.error("HTTP error setting timezone: %s", err)
-        return False
+            await self.client.set_timezone(timezone)
+        except InkVisionError as err:
+            _LOGGER.error("Failed to set timezone: %s", err)
+            return False
+        # Optimistically update coordinator data
+        new_data = deepcopy(self.data or {})
+        new_data.setdefault("config", {})["timeZone"] = timezone
+        self.async_set_updated_data(new_data)
+        return True
 
     async def async_update_ota_status(self) -> None:
         """Refresh OTA status and merge into coordinator data."""
@@ -574,18 +503,13 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
             raise self.error("no_download_url")
 
         try:
-            async with asyncio.timeout(15):
-                async with self.session.post(
-                    f"http://{self.host}/api/ota/update",
-                    json={"url": download_url, "confirm": True},
-                ) as response:
-                    if response.status != 200:
-                        body = await response.text()
-                        raise self.error(
-                            "firmware_update_rejected", status=str(response.status), details=body[:200]
-                        )
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise self.error("communication_error", error=str(err) or "timeout") from err
+            await self.client.start_ota_update(download_url)
+        except InkVisionResponseError as err:
+            raise self.error(
+                "firmware_update_rejected", status=str(err.status), details=err.body
+            ) from err
+        except InkVisionConnectionError as err:
+            raise self.error("communication_error", error=str(err)) from err
 
         _LOGGER.info(
             "Firmware update to %s started on %s; the device reboots when done",
@@ -601,79 +525,52 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         else:
             _LOGGER.debug("WebSocket not connected, using HTTP polling")
         try:
-            async with asyncio.timeout(10):
-                # Fetch sensor data from the device
-                async with self.session.get(f"http://{self.host}/sensors") as response:
-                    if response.status == 200:
-                        sensor_data = await response.json()
-                    else:
-                        raise UpdateFailed(
-                            translation_domain=DOMAIN,
-                            translation_key="update_failed_status",
-                            translation_placeholders={"status": str(response.status)},
-                        )
-                
-                # Fetch status data
-                async with self.session.get(f"http://{self.host}/status") as response:
-                    if response.status == 200:
-                        status_data = await response.json()
-                    else:
-                        raise UpdateFailed(
-                            translation_domain=DOMAIN,
-                            translation_key="update_failed_status",
-                            translation_placeholders={"status": str(response.status)},
-                        )
-
-                screens_data = None
-                try:
-                    async with self.session.get(f"http://{self.host}/display/screens") as response:
-                        if response.status == 200:
-                            screens_data = await response.json()
-                except (aiohttp.ClientError, asyncio.TimeoutError):
-                    _LOGGER.debug("Unable to fetch screen rotation; keeping cached values")
-
-                try:
-                    async with self.session.get(f"http://{self.host}/buttons/actions") as response:
-                        if response.status == 200:
-                            button_actions = await response.json()
-                            if isinstance(button_actions, dict):
-                                self.button_actions = button_actions
-                except (aiohttp.ClientError, asyncio.TimeoutError):
-                    _LOGGER.debug("Unable to fetch button actions; keeping cached values")
-
-                existing = self.data or {"screens": [], "ota": {}}
-                screens = existing.get("screens", [])
-                if isinstance(screens_data, dict):
-                    screens_value = screens_data.get("screens")
-                    if isinstance(screens_value, list):
-                        screens = screens_value
-
-                ota_data = await self.async_fetch_ota_status()
-                if not ota_data:
-                    ota_data = existing.get("ota", {}) if isinstance(existing, dict) else {}
-
-                config_data = await self.async_fetch_config()
-                if not config_data:
-                    config_data = existing.get("config", {}) if isinstance(existing, dict) else {}
-
-                self._last_poll = self.hass.loop.time()
-                return {
-                    "sensors": sensor_data if isinstance(sensor_data, dict) else {},
-                    "status": status_data if isinstance(status_data, dict) else {},
-                    "screens": screens,
-                    "ota": ota_data if isinstance(ota_data, dict) else {},
-                    "config": config_data if isinstance(config_data, dict) else {},
-                }
-                
-        except aiohttp.ClientError as err:
+            sensor_data = await self.client.get_sensors()
+            status_data = await self.client.get_status()
+        except InkVisionResponseError as err:
+            if err.status not in (None, 200):
+                raise UpdateFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="update_failed_status",
+                    translation_placeholders={"status": str(err.status)},
+                ) from err
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        except asyncio.TimeoutError as err:
+        except InkVisionConnectionError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_failed",
-                translation_placeholders={"error": "timeout"},
+                translation_placeholders={"error": str(err)},
             ) from err
+
+        existing = self.data or {"screens": [], "ota": {}}
+        try:
+            screens = await self.client.get_screens()
+        except InkVisionError:
+            _LOGGER.debug("Unable to fetch screen rotation; keeping cached values")
+            screens = existing.get("screens", [])
+
+        try:
+            self.button_actions = await self.client.get_button_actions()
+        except InkVisionError:
+            _LOGGER.debug("Unable to fetch button actions; keeping cached values")
+
+        ota_data = await self.async_fetch_ota_status()
+        if not ota_data:
+            ota_data = existing.get("ota", {}) if isinstance(existing, dict) else {}
+
+        config_data = await self.async_fetch_config()
+        if not config_data:
+            config_data = existing.get("config", {}) if isinstance(existing, dict) else {}
+
+        self._last_poll = self.hass.loop.time()
+        return {
+            "sensors": sensor_data,
+            "status": status_data,
+            "screens": screens,
+            "ota": ota_data if isinstance(ota_data, dict) else {},
+            "config": config_data if isinstance(config_data, dict) else {},
+        }

@@ -15,10 +15,11 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/HomeBrainz/ha-inkVision/issues",
   "loggers": [
-    "custom_components.inkvision"
+    "custom_components.inkvision",
+    "pyinkvision"
   ],
   "requirements": [
-    "websockets>=11.0"
+    "pyinkvision==0.1.0"
   ],
   "ssdp": [],
   "version": "2.0.0",
