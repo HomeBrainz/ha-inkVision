@@ -66,25 +66,33 @@ The integration creates the following entities, depending on your device:
 
 Platform | Description
 -- | --
-`sensor` | Environment and air-quality readings, Wi-Fi signal, and device diagnostics
+`sensor` | Environment and air-quality readings, Wi-Fi signal, and device diagnostics (IP address, MAC, uptime and firmware details start disabled)
 `number` | Display brightness
+`text` | Custom message shown on the display
 `select` | Device timezone, and what each button tap / long press does on the clock
 `switch` | Screens shown in the display rotation
-`binary_sensor` | Firmware update available
-`button` | Check for and install firmware updates
+`button` | Restart
+`update` | Device firmware: shows available updates, their release notes, and installs them
 `event` | Button 1 / Button 2 touch gestures (`single_tap`, `long_press`) on the Atmos Smart Clock
 `media_player` | Speaker playback, volume, and mute
 
-## Services
+The **Firmware update available** binary sensor and the **Check firmware update** / **Install firmware update** buttons are replaced by the firmware update entity. Devices that already have them keep them for now; if an automation or script uses one, a notice under **Settings** > **Repairs** lists it.
 
-- `inkvision.set_brightness`: set the display brightness
-- `inkvision.display_text`: show a custom text on the display
-- `inkvision.restart_device`: restart the device
-- `inkvision.set_screen_rotation`: choose which screens the display rotates through
-- `inkvision.set_timezone`: set the device timezone
+## Actions
+
+- `inkvision.set_screen_rotation`: choose which screens the display rotates through, all at once
 - `inkvision.set_custom_screen`: set the text of a custom screen (slot 1-4); empty text removes it
 
-All services take a target device and can be tried out under **Developer Tools** > **Actions**.
+Both take a target device and can be tried out under **Developer Tools** > **Actions**.
+
+These actions were removed because an entity does the same. Change automations that use them:
+
+Removed action | Use instead
+-- | --
+`inkvision.set_brightness` | `number.set_value` on the **Display brightness** entity
+`inkvision.display_text` | `text.set_value` on the **Custom message** entity
+`inkvision.restart_device` | `button.press` on the **Restart** entity
+`inkvision.set_timezone` | `select.select_option` on the **Timezone** entity
 
 ## Button Automations
 

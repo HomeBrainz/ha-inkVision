@@ -6,8 +6,9 @@ rules:
   action-setup:
     status: done
     comment: >-
-      Registered in async_setup (services.py). Actions raise ServiceValidationError when the
-      device is unknown or its entry is not loaded.
+      Registered in async_setup (services.py). Only actions without an entity equivalent remain
+      (screen rotation, custom screen). Actions raise ServiceValidationError when the device is
+      unknown or its entry is not loaded.
   appropriate-polling:
     status: done
     comment: WebSocket push is primary; HTTP polling every 5 minutes is only a fallback.
@@ -156,8 +157,8 @@ rules:
   repair-issues:
     status: done
     comment: >-
-      Deprecated actions and the firmware entities replaced by the update entity raise issues
-      when used.
+      The firmware entities replaced by the update entity raise an issue while automations or
+      scripts use them.
   stale-devices:
     status: exempt
     comment: One device per entry; removing the entry removes the device.

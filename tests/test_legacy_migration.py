@@ -120,24 +120,28 @@ async def test_legacy_service_alias(
     mock_device_http(aioclient_mock)
     _, device_id, _ = _add_legacy_install(hass)
     await _setup(hass)
-    websocket = await mock_websocket.wait_listening()
+    await mock_websocket.wait_listening()
 
-    assert hass.services.has_service(LEGACY_DOMAIN, "restart_device")
+    assert hass.services.has_service(LEGACY_DOMAIN, "set_screen_rotation")
+    aioclient_mock.post(f"{BASE_URL}/display/screens", json={})
     await hass.services.async_call(
-        LEGACY_DOMAIN, "restart_device", {"device_id": device_id}, blocking=True
+        LEGACY_DOMAIN,
+        "set_screen_rotation",
+        {"device_id": device_id, "screens": ["clock"]},
+        blocking=True,
     )
 
-    assert {"command": "restart"} in websocket.sent
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, "legacy_service_restart_device")
+    assert aioclient_mock.mock_calls[-1][2] == {"screens": ["clock"]}
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "legacy_service_set_screen_rotation")
     assert issue is not None
     assert issue.translation_placeholders == {
-        "old": "homebrainz.restart_device",
-        "new": "inkvision.restart_device",
+        "old": "homebrainz.set_screen_rotation",
+        "new": "inkvision.set_screen_rotation",
     }
 
     await _unload_all(hass)
     # Registered in async_setup like the actions themselves, so they outlive the entries.
-    assert hass.services.has_service(LEGACY_DOMAIN, "restart_device")
+    assert hass.services.has_service(LEGACY_DOMAIN, "set_screen_rotation")
 
 
 async def test_no_legacy_install(hass: HomeAssistant) -> None:

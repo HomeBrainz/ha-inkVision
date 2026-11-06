@@ -91,20 +91,8 @@
     }
   },
   "services": {
-    "set_brightness": {
-      "service": "mdi:brightness-6"
-    },
-    "display_text": {
-      "service": "mdi:message-text-outline"
-    },
-    "restart_device": {
-      "service": "mdi:restart"
-    },
     "set_screen_rotation": {
       "service": "mdi:monitor-shimmer"
-    },
-    "set_timezone": {
-      "service": "mdi:map-clock-outline"
     },
     "set_custom_screen": {
       "service": "mdi:text-box-edit-outline"

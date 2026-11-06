@@ -1,40 +1,5 @@
 # Names and descriptions are in translations/en.json under "services".
 
-set_brightness:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: inkvision
-    brightness:
-      required: true
-      selector:
-        number:
-          min: 0
-          max: 15
-          step: 1
-
-display_text:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: inkvision
-    text:
-      required: true
-      selector:
-        text:
-
-restart_device:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: inkvision
-
 set_screen_rotation:
   fields:
     device_id:
@@ -55,18 +20,6 @@ set_screen_rotation:
             - pressure
             - gas
             - iaq
-
-set_timezone:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: inkvision
-    timezone:
-      required: true
-      selector:
-        text:
 
 set_custom_screen:
   fields:

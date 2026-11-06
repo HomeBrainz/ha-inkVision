@@ -31,14 +31,7 @@ from .conftest import (
     mock_device_http,
 )
 
-SERVICES = {
-    "set_brightness",
-    "display_text",
-    "restart_device",
-    "set_screen_rotation",
-    "set_timezone",
-    "set_custom_screen",
-}
+SERVICES = {"set_screen_rotation", "set_custom_screen"}
 
 
 def _coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> InkVisionDataUpdateCoordinator:
@@ -122,12 +115,14 @@ async def test_services_route_to_their_device(
     second_device = dr.async_get(hass).async_get_device(
         identifiers={(DOMAIN, "11:22:33:44:55:66")}
     )
-    second_ws = mock_websocket.current
-    second_ws.send.reset_mock()
+    aioclient_mock.post(f"http://{second_host}/display/screens", json={})
     await hass.services.async_call(
-        DOMAIN, "restart_device", {"device_id": second_device.id}, blocking=True
+        DOMAIN,
+        "set_screen_rotation",
+        {"device_id": second_device.id, "screens": ["clock"]},
+        blocking=True,
     )
-    assert second_ws.sent == [{"command": "restart"}]
+    assert str(aioclient_mock.mock_calls[-1][1]) == f"http://{second_host}/display/screens"
 
     assert await hass.config_entries.async_unload(second.entry_id)
     await hass.async_block_till_done()
@@ -135,7 +130,10 @@ async def test_services_route_to_their_device(
 
     with pytest.raises(ServiceValidationError) as err:
         await hass.services.async_call(
-            DOMAIN, "restart_device", {"device_id": second_device.id}, blocking=True
+            DOMAIN,
+            "set_screen_rotation",
+            {"device_id": second_device.id, "screens": ["clock"]},
+            blocking=True,
         )
     assert err.value.translation_key == "device_not_loaded"
     assert err.value.translation_placeholders == {"device": "Atmos 2"}
@@ -484,80 +482,6 @@ async def test_poll_if_stale(
     assert aioclient_mock.call_count > calls
 
 
-async def test_service_set_brightness_display_text_restart(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    mock_websocket: FakeWebSocketFactory,
-) -> None:
-    """Test the WebSocket-backed services send their commands."""
-    device_id = _device_id(hass)
-    websocket = mock_websocket.current
-    websocket.send.reset_mock()
-
-    await hass.services.async_call(
-        DOMAIN, "set_brightness", {"device_id": device_id, "brightness": "7"}, blocking=True
-    )
-    await hass.services.async_call(
-        DOMAIN, "display_text", {"device_id": device_id, "text": "Hello"}, blocking=True
-    )
-    await hass.services.async_call(
-        DOMAIN, "restart_device", {"device_id": device_id}, blocking=True
-    )
-
-    assert websocket.sent == [
-        {"command": "set_brightness", "value": 7},
-        {"command": "display_text", "text": "Hello"},
-        {"command": "restart"},
-    ]
-
-
-async def test_deprecated_actions_raise_issue(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    mock_websocket: FakeWebSocketFactory,
-) -> None:
-    """Test actions that duplicate an entity still work and raise a repair issue."""
-    device_id = _device_id(hass)
-    issues = ir.async_get(hass)
-    assert issues.async_get_issue(DOMAIN, "deprecated_action_set_brightness") is None
-
-    await hass.services.async_call(
-        DOMAIN, "set_brightness", {"device_id": device_id, "brightness": 7}, blocking=True
-    )
-
-    assert mock_websocket.current.sent[-1] == {"command": "set_brightness", "value": 7}
-    issue = issues.async_get_issue(DOMAIN, "deprecated_action_set_brightness")
-    assert issue is not None
-    assert issue.translation_key == "deprecated_action"
-    assert issue.translation_placeholders == {
-        "action": "inkvision.set_brightness",
-        "replacement": "number.set_value",
-        "entity": "Display brightness",
-    }
-    assert issues.async_get_issue(DOMAIN, "deprecated_action_restart_device") is None
-
-
-async def test_services_when_websocket_down(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-) -> None:
-    """Test WebSocket-backed services raise when the device is offline."""
-    device_id = _device_id(hass)
-    _coordinator(hass, init_integration)._websocket_connected = False
-
-    for service, data in (
-        ("set_brightness", {"brightness": 7}),
-        ("display_text", {"text": "Hello"}),
-        ("restart_device", {}),
-    ):
-        with pytest.raises(HomeAssistantError) as err:
-            await hass.services.async_call(
-                DOMAIN, service, {"device_id": device_id, **data}, blocking=True
-            )
-        assert err.value.translation_key == "not_connected"
-        assert err.value.translation_placeholders == {"device": init_integration.title}
-
-
 async def test_services_unknown_device(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -571,11 +495,7 @@ async def test_services_unknown_device(
 
     for device_id in ("missing", foreign.id):
         for service, data in (
-            ("set_brightness", {"brightness": 1}),
-            ("display_text", {"text": "x"}),
-            ("restart_device", {}),
             ("set_screen_rotation", {"screens": ["clock"]}),
-            ("set_timezone", {"timezone": "Etc/UTC"}),
             ("set_custom_screen", {"slot": 1}),
         ):
             with pytest.raises(ServiceValidationError) as err:
@@ -625,37 +545,6 @@ async def test_service_set_screen_rotation(
                 blocking=True,
             )
         assert err.value.translation_key == key
-
-
-async def test_service_set_timezone(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    aioclient_mock: AiohttpClientMocker,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Test the timezone service updates the device config."""
-    device_id = _device_id(hass)
-    coordinator = _coordinator(hass, init_integration)
-
-    aioclient_mock.post(f"{BASE_URL}/config", json={})
-    await hass.services.async_call(
-        DOMAIN, "set_timezone", {"device_id": device_id, "timezone": "Etc/UTC"}, blocking=True
-    )
-    assert coordinator.data["config"]["timeZone"] == "Etc/UTC"
-    assert aioclient_mock.mock_calls[-1][2] == {"data": '{"timeZone": "Etc/UTC"}'}
-
-    for mock_kwargs, message in (
-        ({"status": 500}, "Failed to set timezone: HTTP 500"),
-        ({"exc": aiohttp.ClientError()}, "HTTP error setting timezone"),
-    ):
-        aioclient_mock.clear_requests()
-        aioclient_mock.post(f"{BASE_URL}/config", **mock_kwargs)
-        with pytest.raises(HomeAssistantError) as err:
-            await hass.services.async_call(
-                DOMAIN, "set_timezone", {"device_id": device_id, "timezone": "Etc/UTC"}, blocking=True
-            )
-        assert err.value.translation_key == "request_failed"
-        assert message in caplog.text
 
 
 async def test_service_set_custom_screen(

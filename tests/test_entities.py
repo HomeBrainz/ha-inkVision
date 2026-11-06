@@ -181,6 +181,26 @@ async def test_restart_button(
     assert mock_websocket.current.sent[-1] == {"command": "restart"}
 
 
+async def test_commands_when_websocket_down(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Test WebSocket-backed entity commands raise when the device is offline."""
+    init_integration.runtime_data._websocket_connected = False
+
+    for domain, service, suffix, data in (
+        (NUMBER_DOMAIN, SERVICE_SET_VALUE, "brightness_level", {ATTR_VALUE: 7}),
+        (TEXT_DOMAIN, TEXT_SET_VALUE, "custom_text", {ATTR_VALUE: "Hello"}),
+        (BUTTON_DOMAIN, SERVICE_PRESS, "restart", {}),
+    ):
+        entity_id = _entity_id(hass, domain, init_integration, suffix)
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                domain, service, {ATTR_ENTITY_ID: entity_id, **data}, blocking=True
+            )
+        assert err.value.translation_key == "not_connected", suffix
+        assert err.value.translation_placeholders == {"device": init_integration.title}
+
+
 async def test_firmware_update_entity(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -421,15 +441,19 @@ async def test_timezone_select(
     )
     assert hass.states.get(entity_id).state == "Etc/UTC"
 
-    aioclient_mock.clear_requests()
-    aioclient_mock.post(f"{BASE_URL}/config", status=500)
-    with pytest.raises(HomeAssistantError):
-        await hass.services.async_call(
-            SELECT_DOMAIN,
-            SERVICE_SELECT_OPTION,
-            {ATTR_ENTITY_ID: entity_id, ATTR_OPTION: "Europe/London"},
-            blocking=True,
-        )
+    assert aioclient_mock.mock_calls[-1][2] == {"data": '{"timeZone": "Etc/UTC"}'}
+
+    for mock_kwargs in ({"status": 500}, {"exc": aiohttp.ClientError()}):
+        aioclient_mock.clear_requests()
+        aioclient_mock.post(f"{BASE_URL}/config", **mock_kwargs)
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                SELECT_DOMAIN,
+                SERVICE_SELECT_OPTION,
+                {ATTR_ENTITY_ID: entity_id, ATTR_OPTION: "Europe/London"},
+                blocking=True,
+            )
+        assert err.value.translation_key == "request_failed"
 
 
 async def test_button_action_select(
