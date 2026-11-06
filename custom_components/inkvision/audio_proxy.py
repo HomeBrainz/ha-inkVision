@@ -13,8 +13,8 @@ result over plain HTTP:
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from collections import deque
+import contextlib
 from dataclasses import dataclass
 from http import HTTPStatus
 import logging

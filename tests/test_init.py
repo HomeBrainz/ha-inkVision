@@ -6,28 +6,32 @@ from typing import Any
 from unittest.mock import patch
 
 import aiohttp
+from pyinkvision import InkVisionConnectionError
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+
+from custom_components.inkvision.const import DOMAIN
+from custom_components.inkvision.coordinator import (
+    InkVisionData,
+    InkVisionDataUpdateCoordinator,
+)
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-
-from pyinkvision import InkVisionConnectionError
-
-from custom_components.inkvision.coordinator import InkVisionData, InkVisionDataUpdateCoordinator
-from custom_components.inkvision.const import DOMAIN
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 
 from .conftest import (
     BASE_URL,
     HOST,
     MAC,
-    UNIQUE_ID,
     STATUS_PAYLOAD,
+    UNIQUE_ID,
     FakeWebSocketFactory,
     mock_device_http,
 )

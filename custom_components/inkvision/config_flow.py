@@ -4,8 +4,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pyinkvision import InkVisionClient, InkVisionConnectionError, InkVisionResponseError
+from pyinkvision import (
+    InkVisionClient,
+    InkVisionConnectionError,
+    InkVisionResponseError,
+)
 import voluptuous as vol
+
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback

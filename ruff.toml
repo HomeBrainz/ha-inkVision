@@ -1,0 +1,6 @@
+# Import sorting as in home-assistant/core (pyproject.toml, [tool.ruff.lint.isort]).
+[lint.isort]
+force-sort-within-sections = true
+known-first-party = ["homeassistant"]
+combine-as-imports = true
+split-on-trailing-comma = false

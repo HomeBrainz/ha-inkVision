@@ -6,14 +6,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from homeassistant.config_entries import SOURCE_ZEROCONF, ConfigEntryDisabler
-from homeassistant.const import CONF_HOST
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
-from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
@@ -24,6 +16,16 @@ from custom_components.inkvision.legacy_migration import (
     async_setup_legacy,
     legacy_folder,
 )
+from homeassistant.config_entries import SOURCE_ZEROCONF, ConfigEntryDisabler
+from homeassistant.const import CONF_HOST
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from homeassistant.setup import async_setup_component
 
 from .conftest import (
     BASE_URL,

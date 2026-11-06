@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
+
+from homeassistant.core import HomeAssistant
 
 from .conftest import HOST, MAC
 

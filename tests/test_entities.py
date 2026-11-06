@@ -3,6 +3,11 @@ from __future__ import annotations
 
 import aiohttp
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.typing import WebSocketGenerator
+
+from custom_components.inkvision.const import DOMAIN
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.components.media_player import (
     ATTR_MEDIA_CONTENT_ID,
@@ -23,7 +28,10 @@ from homeassistant.components.select import (
     DOMAIN as SELECT_DOMAIN,
     SERVICE_SELECT_OPTION,
 )
-from homeassistant.components.text import DOMAIN as TEXT_DOMAIN, SERVICE_SET_VALUE as TEXT_SET_VALUE
+from homeassistant.components.text import (
+    DOMAIN as TEXT_DOMAIN,
+    SERVICE_SET_VALUE as TEXT_SET_VALUE,
+)
 from homeassistant.components.update import (
     ATTR_INSTALLED_VERSION,
     ATTR_LATEST_VERSION,
@@ -48,11 +56,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-from pytest_homeassistant_custom_component.typing import WebSocketGenerator
-
-from custom_components.inkvision.const import DOMAIN
 
 from .conftest import BASE_URL, HOST, UNIQUE_ID, FakeWebSocketFactory, mock_device_http
 

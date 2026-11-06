@@ -5,6 +5,13 @@ from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.typing import WebSocketGenerator
+
+from custom_components.inkvision.audio_proxy import PROXY_URL_PREFIX
+from custom_components.inkvision.const import DOMAIN
+from custom_components.inkvision.media_player import _is_local_network_host
 from homeassistant.components.media_player import (
     ATTR_MEDIA_ANNOUNCE,
     ATTR_MEDIA_CONTENT_ID,
@@ -33,13 +40,6 @@ from homeassistant.core_config import async_process_ha_core_config
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.network import NoURLAvailableError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-from pytest_homeassistant_custom_component.typing import WebSocketGenerator
-
-from custom_components.inkvision.audio_proxy import PROXY_URL_PREFIX
-from custom_components.inkvision.const import DOMAIN
-from custom_components.inkvision.media_player import _is_local_network_host
 
 from .conftest import BASE_URL, HOST, FakeWebSocketFactory
 
