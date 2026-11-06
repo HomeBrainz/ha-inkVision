@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.core_config import async_process_ha_core_config
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.network import NoURLAvailableError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
@@ -253,7 +254,7 @@ async def test_play_media_without_internal_url(
     aioclient_mock.post(f"{BASE_URL}/speaker/play", json={})
 
     with patch(
-        "custom_components.inkvision.media_player.get_url", side_effect=Exception("no url")
+        "custom_components.inkvision.media_player.get_url", side_effect=NoURLAvailableError
     ):
         await _play_remote_stream(hass, init_integration)
 

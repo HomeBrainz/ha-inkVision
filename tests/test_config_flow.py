@@ -498,13 +498,6 @@ def test_extract_device_info_markers(payload: dict[str, Any], title: str) -> Non
     assert info["host"] == HOST
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Bug: _extract_device_info includes the fallback title 'inkVision' in its "
-        "markers, so any JSON object without name/device/model keys is accepted"
-    ),
-    strict=True,
-)
 def test_extract_device_info_rejects_unmarked_payload() -> None:
     """Test a JSON object with no inkVision markers is not identified as one."""
     assert _extract_device_info({"status": "ok", "uptime": 12}, HOST) is None

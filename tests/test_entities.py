@@ -639,13 +639,6 @@ async def test_speaker(
     assert state.attributes["media_title"] == "News"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Bug: media_player._speaker_data() uses status.get('speaker', {}), which is "
-        "always a dict, so Atmos top-level speaker_* status keys are never read"
-    ),
-    strict=True,
-)
 async def test_speaker_atmos_top_level_status(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

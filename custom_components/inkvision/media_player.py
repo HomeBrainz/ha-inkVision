@@ -6,17 +6,20 @@ import logging
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
-from homeassistant.components.media_player import MediaPlayerEntity
-from homeassistant.components.media_player.const import (
+from homeassistant.components import media_source
+from homeassistant.components.media_player import (
+    BrowseMedia,
+    MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
+    async_process_play_media_url,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.network import get_url
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .audio_proxy import FORMAT_MP3, FORMAT_WAV, async_setup_audio_proxy
 from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
@@ -43,8 +46,7 @@ def _is_local_network_host(hostname: str) -> bool:
 
 SPEAKER_FEATURES = (
     MediaPlayerEntityFeature.BROWSE_MEDIA
-    |
-    MediaPlayerEntityFeature.VOLUME_SET
+    | MediaPlayerEntityFeature.VOLUME_SET
     | MediaPlayerEntityFeature.VOLUME_MUTE
     | MediaPlayerEntityFeature.PLAY
     | MediaPlayerEntityFeature.PAUSE
@@ -95,7 +97,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
 
     def _speaker_data(self) -> dict[str, Any]:
         status = self._status()
-        speaker = status.get("speaker", {})
+        speaker = status.get("speaker")
         if isinstance(speaker, dict):
             return speaker
 
@@ -110,11 +112,6 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         if "speaker_available" in status:
             merged["available"] = status.get("speaker_available")
         return merged
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
 
     @property
     def state(self) -> MediaPlayerState:
@@ -280,9 +277,6 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         older firmware gets MP3, because its WAV path plays far quieter.
         """
         source_url = await self._resolve_source_url(media_id)
-        if source_url is None:
-            return media_id
-
         if (urlparse(source_url).hostname or "") == self._host:
             # Device-local URLs (e.g. /speaker/sample.wav) are played natively.
             return source_url
@@ -293,42 +287,27 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         )
         try:
             base = get_url(self.hass, prefer_external=False)
-        except Exception:
+        except NoURLAvailableError:
             _LOGGER.warning("No internal Home Assistant URL; playing media directly")
             return self._to_device_url(source_url)
 
         return self._to_device_url(f"{base}{proxy_path}")
 
-    async def _resolve_source_url(self, media_id: str) -> str | None:
-        """Resolve media-source IDs and relative paths to an absolute URL."""
-        resolved = media_id
+    async def _resolve_source_url(self, media_id: str) -> str:
+        """Resolve media-source IDs and relative paths to an absolute URL.
 
-        if media_id.startswith("media-source://"):
-            try:
-                from homeassistant.components.media_source import async_resolve_media
+        A media source that can't be resolved, or a relative path when Home
+        Assistant has no URL, raises HomeAssistantError.
+        """
+        if media_source.is_media_source_id(media_id):
+            media = await media_source.async_resolve_media(self.hass, media_id, self.entity_id)
+            media_id = media.url
 
-                media = await async_resolve_media(self.hass, media_id, self.entity_id)
-                resolved = media.url
-            except Exception as err:
-                _LOGGER.error("Failed to resolve %s: %s", media_id, err)
-                return None
-
-        try:
-            from homeassistant.components.media_player.browse_media import (
-                async_process_play_media_url,
-            )
-
-            # Signs HA-local paths (authSig) and makes them absolute.
-            resolved = async_process_play_media_url(self.hass, resolved)
-        except Exception:
-            if resolved.startswith("/"):
-                try:
-                    resolved = f"{get_url(self.hass, prefer_external=False)}{resolved}"
-                except Exception:
-                    return None
+        # Signs HA-local paths (authSig) and makes them absolute.
+        url = async_process_play_media_url(self.hass, media_id)
 
         # ffmpeg cannot read .pls/.m3u radio playlists; use the stream inside.
-        return await async_resolve_playlist(async_get_clientsession(self.hass), resolved)
+        return await async_resolve_playlist(async_get_clientsession(self.hass), url)
 
     def _to_device_url(self, url: str) -> str:
         """Downgrade local HTTPS to HTTP; the firmware supports plain HTTP only."""
@@ -349,15 +328,14 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
 
         return url
 
-    async def async_browse_media(self, media_content_type=None, media_content_id=None):
-        """Browse Home Assistant media sources for this player."""
-        try:
-            from homeassistant.components import media_source
-
-            if not media_content_id:
-                media_content_id = "media-source://"
-
-            return await media_source.async_browse_media(self.hass, media_content_id)
-        except Exception as err:
-            _LOGGER.error("Failed to browse media for inkVision speaker: %s", err)
-            raise
+    async def async_browse_media(
+        self,
+        media_content_type: MediaType | str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        """Browse the audio in Home Assistant's media sources."""
+        return await media_source.async_browse_media(
+            self.hass,
+            media_content_id,
+            content_filter=lambda item: item.media_content_type.startswith("audio/"),
+        )

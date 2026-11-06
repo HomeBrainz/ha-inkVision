@@ -98,7 +98,6 @@ def _extract_device_info(payload: dict[str, Any], host: str) -> dict[str, Any] |
         payload.get("device_type"),
         payload.get("model"),
         payload.get("type"),
-        title,
     )
     supported_markers = (
         "homebrainz",
