@@ -4,6 +4,8 @@ HACS-only, like legacy_migration.py: delete before submitting to core.
 """
 from __future__ import annotations
 
+from typing import override
+
 from homeassistant.components.repairs import ConfirmRepairFlow, RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
@@ -14,6 +16,7 @@ from .legacy_migration import ISSUE_LEGACY_FOLDER, remove_legacy_folder
 class LegacyFolderRepairFlow(ConfirmRepairFlow):
     """Delete custom_components/homebrainz, which HACS leaves behind after the rename."""
 
+    @override
     async def async_step_confirm(self, user_input: dict[str, str] | None = None) -> FlowResult:
         """Remove the folder once the user confirms."""
         if user_input is not None:

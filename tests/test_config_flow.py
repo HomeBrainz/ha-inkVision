@@ -230,11 +230,6 @@ async def test_user_flow_already_configured(
             hostname="esp32.local.",
             properties={"path": "/api/info"},
         ),
-        _zeroconf_info(
-            name="Living room._http._tcp.local.",
-            hostname="esp32.local.",
-            properties={b"path": b"/api/info"},
-        ),
         _zeroconf_info(name="homebrainz-1._http._tcp.local."),
         _zeroconf_info(name="hbz-1._http._tcp.local."),
         _zeroconf_info(name="inkvision-1._http._tcp.local."),
@@ -243,7 +238,6 @@ async def test_user_flow_already_configured(
     ids=[
         "homebrainz_service",
         "api_info_path",
-        "api_info_path_bytes",
         "homebrainz_name",
         "hbz_name",
         "inkvision_name",
@@ -355,12 +349,10 @@ async def test_zeroconf_flow_updates_host_of_configured_device(
     assert mock_config_entry.data[CONF_HOST] == new_host
 
 
-@pytest.mark.parametrize("properties", [{"mac": MAC}, {b"mac": MAC.encode()}], ids=["str", "bytes"])
 async def test_zeroconf_flow_known_mac_skips_probe(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
-    properties: dict[Any, Any],
 ) -> None:
     """Test a configured device advertising its MAC is recognised without contacting it."""
     mock_config_entry.add_to_hass(hass)
@@ -369,7 +361,7 @@ async def test_zeroconf_flow_known_mac_skips_probe(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": SOURCE_ZEROCONF},
-        data=_zeroconf_info(host=new_host, properties=properties),
+        data=_zeroconf_info(host=new_host, properties={"mac": MAC}),
     )
 
     assert result["type"] is FlowResultType.ABORT

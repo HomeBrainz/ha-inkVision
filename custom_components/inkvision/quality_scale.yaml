@@ -100,8 +100,10 @@ rules:
       Devices have no authentication today. Becomes required if the security roadmap adds
       device credentials or tokens.
   test-coverage:
-    status: todo
-    comment: 93% overall; media_player.py (74%) is the main gap.
+    status: done
+    comment: >-
+      98% overall and above 95% in every module except the HACS-only legacy_migration.py and
+      repairs.py, which don't go to core. CI runs the tests.
 
   # Gold
   devices:
@@ -170,5 +172,7 @@ rules:
     status: done
     comment: pyinkvision takes HA's shared aiohttp session for HTTP and the WebSocket.
   strict-typing:
-    status: todo
-    comment: Many functions lack type hints; the library and integration need to pass mypy --strict.
+    status: done
+    comment: >-
+      mypy.ini has core's settings for .strict-typing integrations and CI runs it; pyinkvision
+      ships py.typed.

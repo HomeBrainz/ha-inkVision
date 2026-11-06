@@ -1,6 +1,8 @@
 """Base entity for inkVision."""
 from __future__ import annotations
 
+from typing import override
+
 from homeassistant.components.automation import automations_with_entity
 from homeassistant.components.script import scripts_with_entity
 from homeassistant.core import HomeAssistant, callback
@@ -22,6 +24,7 @@ class InkVisionEntity(CoordinatorEntity[InkVisionDataUpdateCoordinator]):
     _attr_has_entity_name = True
 
     @property
+    @override
     def device_info(self) -> DeviceInfo:
         """Return device information."""
         status = self.coordinator.data.status

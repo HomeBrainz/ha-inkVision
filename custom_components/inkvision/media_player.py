@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-from typing import Any
+from typing import Any, override
 from urllib.parse import urlparse, urlunparse
 
 from homeassistant.components import media_source
@@ -111,6 +111,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         return merged
 
     @property
+    @override
     def state(self) -> MediaPlayerState:
         """Return the current playback state."""
         status = self._status()
@@ -144,6 +145,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         return self._optimistic_state
 
     @property
+    @override
     def volume_level(self) -> float | None:
         """Volume level in range 0.0..1.0."""
         status = self._status()
@@ -161,6 +163,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         return self._optimistic_volume_level
 
     @property
+    @override
     def is_volume_muted(self) -> bool | None:
         """Return muted state."""
         status = self._status()
@@ -176,6 +179,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         return self._optimistic_is_muted
 
     @property
+    @override
     def media_title(self) -> str | None:
         """Return current media title when available."""
         status = self._status()
@@ -183,6 +187,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         title = speaker.get("title") or status.get("media_title")
         return title if isinstance(title, str) else None
 
+    @override
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute/unmute playback."""
         success = await self.coordinator.async_speaker_command("mute", muted=mute)
@@ -191,16 +196,18 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         self._optimistic_is_muted = mute
         self.async_write_ha_state()
 
+    @override
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level."""
         volume = max(0.0, min(1.0, volume))
-        percent = int(round(volume * 100))
+        percent = round(volume * 100)
         success = await self.coordinator.async_speaker_command("set_volume", value=percent)
         if not success:
             raise self.coordinator.error("request_failed")
         self._optimistic_volume_level = volume
         self.async_write_ha_state()
 
+    @override
     async def async_media_play(self) -> None:
         """Resume playback."""
         if self._last_media_id:
@@ -217,6 +224,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         self._optimistic_state = MediaPlayerState.PLAYING
         self.async_write_ha_state()
 
+    @override
     async def async_media_pause(self) -> None:
         """Pause playback."""
         success = await self.coordinator.async_speaker_command("pause")
@@ -226,6 +234,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         self._optimistic_state = MediaPlayerState.IDLE
         self.async_write_ha_state()
 
+    @override
     async def async_media_stop(self) -> None:
         """Stop playback."""
         success = await self.coordinator.async_speaker_command("stop")
@@ -234,6 +243,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         self._optimistic_state = MediaPlayerState.IDLE
         self.async_write_ha_state()
 
+    @override
     async def async_play_media(
         self,
         media_type: MediaType | str,
@@ -325,6 +335,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
 
         return url
 
+    @override
     async def async_browse_media(
         self,
         media_content_type: MediaType | str | None = None,

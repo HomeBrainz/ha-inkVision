@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import override
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.config_entries import ConfigEntry
@@ -71,10 +72,12 @@ class InkVisionButtonEvent(InkVisionEntity, EventEntity):
         self._attr_unique_id = f"{coordinator.device_key}_button_{button}_event"
 
     @property
+    @override
     def available(self) -> bool:
         """Unavailable on firmware that doesn't push button events."""
         return super().available and bool(self.coordinator.data.status.get("button_events"))
 
+    @override
     async def async_added_to_hass(self) -> None:
         """Subscribe to button pushes from the coordinator."""
         await super().async_added_to_hass()

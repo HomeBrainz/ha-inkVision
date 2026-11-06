@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import override
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -46,6 +47,7 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
         self._attr_unique_id = f"{coordinator.device_key}_brightness_level"
 
     @property
+    @override
     def native_value(self) -> int | None:
         """Return the current brightness level."""
         value = self.coordinator.data.status.get("brightness")
@@ -57,9 +59,10 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
             _LOGGER.debug("Received non-integer brightness value: %s", value)
             return None
 
+    @override
     async def async_set_native_value(self, value: float) -> None:
         """Set a new brightness level."""
-        brightness = max(self._attr_native_min_value, min(self._attr_native_max_value, int(round(value))))
+        brightness = max(self._attr_native_min_value, min(self._attr_native_max_value, round(value)))
 
         if not await self.coordinator.send_device_command("set_brightness", value=brightness):
             raise self.coordinator.error("not_connected")

@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from . import legacy_migration
 from .const import CUSTOM_SCREEN_SLOTS, DOMAIN
-from .coordinator import InkVisionDataUpdateCoordinator
+from .coordinator import InkVisionConfigEntry, InkVisionDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> InkVisio
         )
 
     for entry_id in device.config_entries:
-        entry = hass.config_entries.async_get_entry(entry_id)
+        entry: InkVisionConfigEntry | None = hass.config_entries.async_get_entry(entry_id)
         if entry is None or entry.domain != DOMAIN:
             continue
         if entry.state is not ConfigEntryState.LOADED:

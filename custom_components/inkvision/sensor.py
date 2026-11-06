@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import logging
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -218,6 +218,13 @@ class InkVisionSensorEntity(InkVisionEntity, SensorEntity):
             return default
         return section_data.get(key, default)
 
+    def get_sensor_number(self, section: str, key: str) -> float | None:
+        """Get a numeric reading from a sensor subsection; anything else counts as missing."""
+        value = self.get_sensor_value(section, key)
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return None
+        return value
+
     def get_status_value(self, key: str, default: Any | None = None) -> Any | None:
         """Get a value from the status section."""
         return self.coordinator.data.status.get(key, default)
@@ -263,6 +270,7 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
             self._attr_suggested_display_precision = suggested_display_precision
 
     @property
+    @override
     def native_value(self) -> Any | None:
         """Return the extracted value."""
         return self._value_fn(self)
@@ -285,16 +293,17 @@ class InkVisionTemperatureSensor(InkVisionSensorEntity):
         self._attr_suggested_display_precision = 1
 
     @property
+    @override
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
         # Prefer BME680 temperature
-        temp = self.get_sensor_value("bme680", "temperature")
+        temp = self.get_sensor_number("bme680", "temperature")
         if temp is not None:
             _LOGGER.debug("Temperature sensor returning BME680 value: %s", temp)
             return temp
 
         # Legacy fallback for older firmware
-        temp = self.get_sensor_value("aht20", "temperature")
+        temp = self.get_sensor_number("aht20", "temperature")
         if temp is not None:
             _LOGGER.debug("Temperature sensor returning legacy AHT20 value: %s", temp)
             return temp
@@ -320,13 +329,14 @@ class InkVisionHumiditySensor(InkVisionSensorEntity):
         self._attr_suggested_display_precision = 1
 
     @property
+    @override
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
-        humidity = self.get_sensor_value("bme680", "humidity")
+        humidity = self.get_sensor_number("bme680", "humidity")
         if humidity is not None:
             return humidity
 
-        return self.get_sensor_value("aht20", "humidity")
+        return self.get_sensor_number("aht20", "humidity")
 
 
 class InkVisionPressureSensor(InkVisionSensorEntity):
@@ -346,9 +356,10 @@ class InkVisionPressureSensor(InkVisionSensorEntity):
         self._attr_suggested_display_precision = 0
 
     @property
+    @override
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
-        pressure = self.get_sensor_value("bme680", "pressure")
+        pressure = self.get_sensor_number("bme680", "pressure")
         if pressure is not None:
             return pressure
 
@@ -372,6 +383,7 @@ class InkVisionWiFiSignalSensor(InkVisionSensorEntity):
         self._attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
 
     @property
+    @override
     def native_value(self) -> int | None:
         """Return the state of the sensor."""
         return self.coordinator.data.status.get("rssi")

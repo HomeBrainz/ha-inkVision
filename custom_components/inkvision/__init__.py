@@ -5,7 +5,7 @@ from datetime import timedelta
 import logging
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import (
     config_validation as cv,
@@ -13,6 +13,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 from homeassistant.helpers.event import (
+    EventStateChangedData,
     TrackTemplate,
     TrackTemplateResult,
     async_track_template_result,
@@ -67,7 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: InkVisionConfigEntry) ->
     await coordinator.async_config_entry_first_refresh()
 
     # Start WebSocket connection
-    await coordinator.async_start_websocket()
+    coordinator.async_start_websocket()
 
     # Independent of the coordinator's own timer, which WebSocket pushes keep
     # resetting; check once a minute and poll when the last poll is stale.
@@ -99,7 +100,11 @@ def _async_track_custom_screen_templates(
         template = Template(template_str, hass)
 
         @callback
-        def _on_result(event, updates: list[TrackTemplateResult], slot=slot) -> None:
+        def _on_result(
+            event: Event[EventStateChangedData] | None,
+            updates: list[TrackTemplateResult],
+            slot: int = slot,
+        ) -> None:
             result = updates.pop().result
             if isinstance(result, TemplateError):
                 _LOGGER.warning("Custom screen %d template error: %s", slot, result)

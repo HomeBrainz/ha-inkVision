@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import override
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.config_entries import ConfigEntry
@@ -52,6 +53,7 @@ class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
         self._attr_native_value = ""
 
     @property
+    @override
     def available(self) -> bool:
         """Unavailable on firmware that predates the display_text command.
 
@@ -65,6 +67,7 @@ class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
         firmware_id = self.coordinator.data.status.get("firmware_id")
         return isinstance(firmware_id, int) and firmware_id >= MIN_FIRMWARE_ID_CUSTOM_TEXT
 
+    @override
     async def async_set_value(self, value: str) -> None:
         """Show the message on the device's display (auto-reverts on its own after a timeout)."""
         success = await self.coordinator.send_device_command("display_text", text=value)

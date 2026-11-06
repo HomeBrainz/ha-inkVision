@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import override
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
@@ -116,13 +117,13 @@ class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
         self._attr_unique_id = f"{coordinator.device_key}_timezone"
 
     @property
+    @override
     def current_option(self) -> str | None:
         """Return the current timezone."""
         tz = self.coordinator.data.config.get("timeZone")
-        if tz and tz in SUPPORTED_TIMEZONES:
-            return tz
-        return None
+        return tz if isinstance(tz, str) and tz in SUPPORTED_TIMEZONES else None
 
+    @override
     async def async_select_option(self, option: str) -> None:
         """Set the timezone on the device."""
         if option not in SUPPORTED_TIMEZONES:
@@ -175,10 +176,12 @@ class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
         self._attr_unique_id = f"{coordinator.device_key}_{button}_{gesture}_action"
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and bool(self.coordinator.button_actions)
 
     @property
+    @override
     def current_option(self) -> str | None:
         """Return the gesture's current action."""
         action = (self.coordinator.button_actions.get(self._button) or {}).get(self._gesture)
@@ -187,6 +190,7 @@ class InkVisionButtonActionSelect(InkVisionEntity, SelectEntity):
                 return option
         return None
 
+    @override
     async def async_select_option(self, option: str) -> None:
         """Set the gesture's action on the device."""
         if option not in BUTTON_ACTIONS:

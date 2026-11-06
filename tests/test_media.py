@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from http import HTTPStatus
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -260,3 +260,35 @@ async def test_play_media_without_internal_url(
 
     assert aioclient_mock.mock_calls[-1][2]["media_id"] == STREAM_URL
     assert "No internal Home Assistant URL" in caplog.text
+
+
+async def test_proxy_rerequest_and_dropped_stream(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """Test a repeated request restarts ffmpeg, and a dropped stream ends quietly."""
+    await async_process_ha_core_config(hass, {"internal_url": "http://192.168.1.10:8123"})
+    aioclient_mock.post(f"{BASE_URL}/speaker/play", json={})
+    await _play_remote_stream(hass, init_integration)
+    path = aioclient_mock.mock_calls[-1][2]["media_id"].removeprefix("http://192.168.1.10:8123")
+    conversion = hass.data[DATA_AUDIO_PROXY].find(
+        init_integration.entry_id, path.rsplit("/", 1)[1].split(".")[0]
+    )
+    running = MagicMock(returncode=None)
+    conversion.proc = running
+
+    process = _FakeProcess(b"", b"", 0)
+    process.stdout.read = AsyncMock(side_effect=ConnectionResetError)
+    client = await hass_client_no_auth()
+    with patch(
+        "custom_components.inkvision.audio_proxy.asyncio.create_subprocess_exec",
+        return_value=process,
+    ):
+        response = await client.get(path)
+        assert response.status == HTTPStatus.OK
+        await response.read()
+
+    running.kill.assert_called_once()
+    assert conversion.is_finished

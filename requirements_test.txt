@@ -5,3 +5,5 @@ pytest-homeassistant-custom-component==0.13.316
 # Integration requirement (manifest.json) and the ffmpeg dependency's requirement
 pyinkvision==0.1.0
 ha-ffmpeg==3.2.2
+# Type checking with core's strict settings (mypy.ini)
+mypy==2.4.1

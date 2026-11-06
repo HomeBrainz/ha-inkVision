@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, override
 
 from pyinkvision import InkVisionConnectionError, InkVisionResponseError
 
@@ -79,15 +80,18 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
         self._attr_translation_key = f"screen_{screen_id}"
 
     @property
+    @override
     def is_on(self) -> bool:
         """Return whether the screen is enabled in rotation."""
         return self._screen_id in self._get_enabled_screens()
 
-    async def async_turn_on(self, **kwargs) -> None:
+    @override
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable the screen."""
         await self._set_enabled(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    @override
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable the screen."""
         await self._set_enabled(False)
 

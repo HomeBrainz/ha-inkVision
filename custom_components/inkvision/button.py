@@ -1,6 +1,8 @@
 """Button platform for inkVision integration."""
 from __future__ import annotations
 
+from typing import override
+
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, Platform
@@ -59,6 +61,7 @@ class InkVisionRestartButton(InkVisionButtonEntity):
         super().__init__(coordinator, config_entry)
         self._attr_unique_id = f"{coordinator.device_key}_restart"
 
+    @override
     async def async_press(self) -> None:
         """Restart the device."""
         if not await self.coordinator.send_device_command("restart"):
@@ -79,6 +82,7 @@ class InkVisionFirmwareCheckButton(InkVisionButtonEntity):
         super().__init__(coordinator, config_entry)
         self._attr_unique_id = f"{coordinator.device_key}_firmware_check"
 
+    @override
     async def async_press(self) -> None:
         """Handle the button press."""
         await self.coordinator.async_update_ota_status()
@@ -98,6 +102,7 @@ class InkVisionFirmwareUpdateButton(InkVisionButtonEntity):
         super().__init__(coordinator, config_entry)
         self._attr_unique_id = f"{coordinator.device_key}_firmware_update"
 
+    @override
     async def async_press(self) -> None:
         """Re-check for an update, then install it."""
         await self.coordinator.async_install_firmware()

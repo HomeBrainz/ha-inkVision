@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, override
 
 from pyinkvision import (
     InkVisionClient,
@@ -12,18 +12,13 @@ from pyinkvision import (
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TemplateSelector
-
-try:
-    # Newer Home Assistant versions
-    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
-except ImportError:  # pragma: no cover - fallback for older HA cores
-    from homeassistant.components.zeroconf import ZeroconfServiceInfo
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .const import CONF_CUSTOM_SCREEN_PREFIX, CUSTOM_SCREEN_SLOTS, DOMAIN, LEGACY_DOMAIN
 from .coordinator import normalize_mac
@@ -63,7 +58,7 @@ def _is_inkvision_discovery(discovery_info: ZeroconfServiceInfo) -> bool:
     hostname = _decode_discovery_value(getattr(discovery_info, "hostname", "")).lower()
     server = _decode_discovery_value(getattr(discovery_info, "server", "")).lower()
     service_type = _decode_discovery_value(getattr(discovery_info, "type", "")).lower()
-    path = _decode_discovery_value(properties.get("path") or properties.get(b"path")).lower()
+    path = _decode_discovery_value(properties.get("path")).lower()
 
     # "homebrainz"/"hbz" here and below are what the firmware advertises and
     # reports, not the integration's name; they stay after the rename.
@@ -179,14 +174,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
+    @override
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> OptionsFlowHandler:
         """Return the options flow."""
         return OptionsFlowHandler(config_entry)
 
+    @override
     async def async_step_zeroconf(
         self,
         discovery_info: ZeroconfServiceInfo,
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle Zeroconf discovery."""
         if not _is_inkvision_discovery(discovery_info):
             return self.async_abort(reason="invalid_device")
@@ -198,7 +195,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Newer firmware advertises its MAC, so a known device is recognised
         # without contacting it. Older firmware is identified by the probe below.
         properties = discovery_info.properties or {}
-        if mac := normalize_mac(_decode_discovery_value(properties.get("mac") or properties.get(b"mac"))):
+        if mac := normalize_mac(_decode_discovery_value(properties.get("mac"))):
             await self.async_set_unique_id(mac)
             self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 
@@ -226,7 +223,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Ask the user before adding a discovered device."""
         if user_input is not None:
             return self.async_create_entry(
@@ -260,7 +257,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             None,
         )
 
-    async def async_step_import(self, import_data: dict[str, Any]) -> FlowResult:
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
         """Take over an entry of the pre-rename "homebrainz" domain (legacy: HACS-only)."""
         old = self.hass.config_entries.async_get_entry(import_data[CONF_MIGRATE_FROM])
         if old is None:
@@ -270,9 +267,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title=old.title, data=import_data, options=dict(old.options))
 
+    @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
         
@@ -309,7 +307,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Change the host of a configured device."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
@@ -351,7 +349,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Edit the template behind each custom screen slot."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)

@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 import re
-from typing import Any
+from typing import Any, override
 
 from pyinkvision import (
     InkVisionClient,
@@ -15,6 +16,7 @@ from pyinkvision import (
     InkVisionResponseError,
     InkVisionUnsupportedError,
     InkVisionWebSocket,
+    SpeakerAction,
 )
 
 from homeassistant.config_entries import ConfigEntry
@@ -87,18 +89,18 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
         self.client = InkVisionClient(host, async_get_clientsession(hass))
         self._websocket: InkVisionWebSocket | None = None
         self._retry_count = 0
-        self._websocket_task = None
+        self._websocket_task: asyncio.Task[None] | None = None
         self._websocket_connected = False
         # monotonic time of the last successful HTTP poll; see async_poll_if_stale
         self._last_poll: float | None = None
         # Callbacks for "button_event" pushes (the event platform registers here)
-        self._button_listeners: list = []
+        self._button_listeners: list[Callable[[dict[str, Any]], None]] = []
         # Custom screen text per slot (1-based). The device keeps it in RAM only,
         # so every slot is re-sent whenever the WebSocket (re)connects.
         self.custom_screens: dict[int, str] = {}
         # GET /buttons/actions: {"button1": {"singleTap": ..., "longPress": ...}, "button2": {...}}.
         # Kept out of self.data, which every WebSocket push rebuilds from a fixed set of keys.
-        self.button_actions: dict = {}
+        self.button_actions: dict[str, Any] = {}
         
         super().__init__(
             hass,
@@ -108,7 +110,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
             update_interval=UPDATE_INTERVAL,  # Fallback polling
         )
 
-    async def async_poll_if_stale(self, _now=None) -> None:
+    async def async_poll_if_stale(self, _now: datetime | None = None) -> None:
         """Run the HTTP poll if it has not succeeded within UPDATE_INTERVAL.
 
         Every WebSocket push goes through async_set_updated_data(), which resets
@@ -121,12 +123,17 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
             return
         await self.async_refresh()
 
-    async def async_start_websocket(self):
-        """Start the WebSocket connection."""
+    @callback
+    def async_start_websocket(self) -> None:
+        """Start the WebSocket connection; config entry unload cancels it."""
         if self._websocket_task is None or self._websocket_task.done():
-            self._websocket_task = asyncio.create_task(self._websocket_handler())
+            self._websocket_task = self.config_entry.async_create_background_task(
+                self.hass,
+                self._websocket_handler(),
+                f"{DOMAIN} websocket {self.config_entry.entry_id}",
+            )
 
-    async def async_stop_websocket(self):
+    async def async_stop_websocket(self) -> None:
         """Stop the WebSocket connection."""
         if self._websocket_task:
             self._websocket_task.cancel()
@@ -139,7 +146,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
             await self._websocket.close()
             self._websocket = None
 
-    async def _websocket_handler(self):
+    async def _websocket_handler(self) -> None:
         """Handle WebSocket connection and messages."""
         while True:
             try:
@@ -192,7 +199,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
                 self._websocket = None
                 await asyncio.sleep(WEBSOCKET_RETRY_DELAY)
 
-    async def _send_websocket_command(self, command: dict):
+    async def _send_websocket_command(self, command: dict[str, Any]) -> None:
         """Send a command to the WebSocket."""
         if not self._websocket or self._websocket.closed:
             _LOGGER.debug("Skipping send; WebSocket not connected: %s", command)
@@ -271,18 +278,18 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
             translation_placeholders={"device": self.config_entry.title, **placeholders},
         )
 
-    async def send_device_command(self, command: str, **kwargs):
-        """Send a command to the device."""
-        if self._websocket_connected:
-            cmd_data = {"command": command, **kwargs}
-            await self._send_websocket_command(cmd_data)
-            return True
-        else:
+    async def send_device_command(self, command: str, **kwargs: Any) -> bool:
+        """Send a command over the WebSocket; return False when it is not connected."""
+        if not self._websocket_connected:
             _LOGGER.warning("Cannot send command %s: WebSocket not connected", command)
             return False
+        await self._send_websocket_command({"command": command, **kwargs})
+        return True
 
     @callback
-    def async_add_button_listener(self, listener) -> callable:
+    def async_add_button_listener(
+        self, listener: Callable[[dict[str, Any]], None]
+    ) -> Callable[[], None]:
         """Register a callback for button gestures; returns the unsubscribe function."""
         self._button_listeners.append(listener)
 
@@ -337,23 +344,9 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
         for slot in range(1, CUSTOM_SCREEN_SLOTS + 1):
             await self._send_websocket_command({"command": "set_custom_screen", "slot": slot, "text": ""})
 
-    async def async_speaker_command(self, action: str, **kwargs) -> bool:
+    async def async_speaker_command(self, action: SpeakerAction, **kwargs: Any) -> bool:
         """Send a speaker command via HTTP first, then WebSocket fallback."""
         payload = {key: value for key, value in kwargs.items() if value is not None}
-        ws_command_by_action = {
-            "play": "speaker_play",
-            "pause": "speaker_pause",
-            "stop": "speaker_stop",
-            "set_volume": "speaker_set_volume",
-            "mute": "speaker_mute",
-            "play_media": "speaker_play_media",
-        }
-
-        ws_command = ws_command_by_action.get(action)
-        if ws_command is None:
-            _LOGGER.error("Unknown speaker action requested: %s", action)
-            return False
-
         try:
             await self.client.speaker_command(action, **payload)
         except (InkVisionUnsupportedError, InkVisionConnectionError) as err:
@@ -365,9 +358,9 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
         else:
             return True
 
-        return await self.send_device_command(ws_command, **payload)
+        return await self.send_device_command(f"speaker_{action}", **payload)
 
-    async def async_fetch_ota_status(self) -> dict:
+    async def async_fetch_ota_status(self) -> dict[str, Any]:
         """Fetch OTA status via HTTP."""
         try:
             return await self.client.get_ota_status()
@@ -375,7 +368,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
             _LOGGER.debug("OTA check failed: %s", err)
         return {}
 
-    async def async_fetch_config(self) -> dict:
+    async def async_fetch_config(self) -> dict[str, Any]:
         """Fetch device config via HTTP."""
         try:
             return await self.client.get_config()
@@ -434,6 +427,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
         )
         return str(ota.get("latestVersion"))
 
+    @override
     async def _async_update_data(self) -> InkVisionData:
         """Update data via HTTP (fallback when WebSocket is not available)."""
         if self._websocket_connected:

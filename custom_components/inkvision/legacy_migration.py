@@ -14,7 +14,7 @@ actions keep working as aliases.
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 import json
 import logging
 from pathlib import Path
@@ -192,7 +192,7 @@ async def async_take_over_legacy_entry(hass: HomeAssistant, entry: ConfigEntry) 
 @callback
 def async_register_service_aliases(
     hass: HomeAssistant,
-    services: dict[str, tuple[Callable[[ServiceCall], Coroutine[Any, Any, None]], vol.Schema]],
+    services: Mapping[str, tuple[Callable[[ServiceCall], Coroutine[Any, Any, None]], vol.Schema]],
 ) -> None:
     """Keep "homebrainz.<action>" working; each use raises a repair issue naming the new action."""
     for name, (handler, schema) in services.items():
@@ -200,7 +200,11 @@ def async_register_service_aliases(
             # The old integration is still installed and registered it itself.
             continue
 
-        async def alias(call: ServiceCall, name: str = name, handler=handler) -> None:
+        async def alias(
+            call: ServiceCall,
+            name: str = name,
+            handler: Callable[[ServiceCall], Coroutine[Any, Any, None]] = handler,
+        ) -> None:
             ir.async_create_issue(
                 hass,
                 DOMAIN,

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -68,6 +68,7 @@ class InkVisionFirmwareUpdateAvailableSensor(InkVisionBinarySensor):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
+    @override
     def is_on(self) -> bool | None:
         """Return True if an update is available."""
         value = self.coordinator.data.ota.get("updateAvailable")
@@ -76,6 +77,7 @@ class InkVisionFirmwareUpdateAvailableSensor(InkVisionBinarySensor):
         return bool(value)
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return OTA metadata attributes."""
         ota = self.coordinator.data.ota
