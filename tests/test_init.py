@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 from websockets.exceptions import ConnectionClosedError
@@ -466,6 +467,32 @@ async def test_service_set_brightness_display_text_restart(
         {"command": "display_text", "text": "Hello"},
         {"command": "restart"},
     ]
+
+
+async def test_deprecated_actions_raise_issue(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_websocket: FakeWebSocketFactory,
+) -> None:
+    """Test actions that duplicate an entity still work and raise a repair issue."""
+    device_id = _device_id(hass)
+    issues = ir.async_get(hass)
+    assert issues.async_get_issue(DOMAIN, "deprecated_action_set_brightness") is None
+
+    await hass.services.async_call(
+        DOMAIN, "set_brightness", {"device_id": device_id, "brightness": 7}, blocking=True
+    )
+
+    assert mock_websocket.current.sent[-1] == {"command": "set_brightness", "value": 7}
+    issue = issues.async_get_issue(DOMAIN, "deprecated_action_set_brightness")
+    assert issue is not None
+    assert issue.translation_key == "deprecated_action"
+    assert issue.translation_placeholders == {
+        "action": "inkvision.set_brightness",
+        "replacement": "number.set_value",
+        "entity": "Display brightness",
+    }
+    assert issues.async_get_issue(DOMAIN, "deprecated_action_restart_device") is None
 
 
 async def test_services_when_websocket_down(

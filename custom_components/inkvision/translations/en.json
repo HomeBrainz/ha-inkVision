@@ -88,6 +88,10 @@
     "legacy_duplicate": {
       "title": "{title} is set up twice",
       "description": "{title} was added to inkVision and also still exists under the old HomeBrainz name. Remove the HomeBrainz entry under **Settings** > **Devices & services**."
+    },
+    "deprecated_action": {
+      "title": "The {action} action is deprecated",
+      "description": "An automation or script called `{action}`. It still works for now, but it will be removed in a future release. Use the `{replacement}` action on the device's {entity} entity instead, then ignore this notice."
     }
   },
   "exceptions": {
@@ -144,6 +148,104 @@
     },
     "update_failed": {
       "message": "Error communicating with the device: {error}"
+    }
+  },
+  "services": {
+    "set_brightness": {
+      "name": "Set display brightness",
+      "description": "Sets the display brightness. Deprecated: use the device's Display brightness entity instead.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "0 turns the display off, 15 is brightest."
+        }
+      }
+    },
+    "display_text": {
+      "name": "Display text",
+      "description": "Shows a message on the display for a while. Deprecated: use the device's Custom message entity instead.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        },
+        "text": {
+          "name": "Text",
+          "description": "The message to show."
+        }
+      }
+    },
+    "restart_device": {
+      "name": "Restart device",
+      "description": "Restarts the device.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        }
+      }
+    },
+    "set_screen_rotation": {
+      "name": "Set screen rotation",
+      "description": "Selects which screens the display rotates through, all at once.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        },
+        "screens": {
+          "name": "Screens",
+          "description": "The screens to rotate through. They are shown in a fixed order."
+        }
+      }
+    },
+    "set_timezone": {
+      "name": "Set timezone",
+      "description": "Sets the timezone of the device's clock. Deprecated: use the device's Timezone entity instead.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        },
+        "timezone": {
+          "name": "Timezone",
+          "description": "IANA timezone name, for example Europe/Prague."
+        }
+      }
+    },
+    "set_custom_screen": {
+      "name": "Set custom screen",
+      "description": "Sets the text of a custom screen. Screens with text join the display rotation after the regular screens; empty text removes the screen. A slot that has a template in the integration options is overwritten the next time the template changes.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The inkVision device to control."
+        },
+        "slot": {
+          "name": "Slot",
+          "description": "Custom screen slot, 1 to 4."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Text to show, up to 64 characters; longer text scrolls. Leave empty to remove the screen."
+        }
+      }
+    }
+  },
+  "selector": {
+    "screen": {
+      "options": {
+        "clock": "Clock",
+        "temp": "Temperature",
+        "humidity": "Humidity",
+        "pressure": "Pressure",
+        "gas": "Gas",
+        "iaq": "Air quality"
+      }
     }
   }
 }

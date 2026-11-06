@@ -1,19 +1,13 @@
-# Services for inkVision integration
+# Names and descriptions are in translations/en.json under "services".
 
 set_brightness:
-  name: Set Display Brightness
-  description: Set the display brightness of the inkVision device
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to control
       required: true
       selector:
         device:
           integration: inkvision
     brightness:
-      name: Brightness Level
-      description: Brightness level (0-15, where 0 turns the display off and 15 is brightest)
       required: true
       selector:
         number:
@@ -22,101 +16,66 @@ set_brightness:
           step: 1
 
 display_text:
-  name: Display Custom Text
-  description: Display custom text on the inkVision device
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to control
       required: true
       selector:
         device:
           integration: inkvision
     text:
-      name: Text
-      description: The text to display on the device
       required: true
       selector:
         text:
 
 restart_device:
-  name: Restart Device
-  description: Restart the inkVision device
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to restart
       required: true
       selector:
         device:
           integration: inkvision
 
 set_screen_rotation:
-  name: Set Screen Rotation
-  description: Select which screens the display rotates through
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to control
       required: true
       selector:
         device:
           integration: inkvision
     screens:
-      name: Screens
-      description: The screens to include in rotation (order is fixed)
       required: true
       selector:
         select:
           multiple: true
+          translation_key: screen
           options:
-            - label: Clock
-              value: clock
-            - label: Temperature
-              value: temp
-            - label: Humidity
-              value: humidity
-            - label: Pressure
-              value: pressure
-            - label: Gas
-              value: gas
-            - label: Air Quality
-              value: iaq
+            - clock
+            - temp
+            - humidity
+            - pressure
+            - gas
+            - iaq
 
 set_timezone:
-  name: Set Timezone
-  description: Set the timezone on the inkVision device
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to control
       required: true
       selector:
         device:
           integration: inkvision
     timezone:
-      name: Timezone
-      description: IANA timezone name (e.g. Europe/Prague)
       required: true
       selector:
         text:
+
 set_custom_screen:
-  name: Set Custom Screen
-  description: >-
-    Set the text of a custom screen. Screens with text join the display rotation
-    after the regular screens; empty text removes the screen. A slot that has a
-    template in the integration options is overwritten the next time the template changes.
   fields:
     device_id:
-      name: Device
-      description: The inkVision device to control
       required: true
       selector:
         device:
           integration: inkvision
     slot:
-      name: Slot
-      description: Custom screen slot (1-4)
       required: true
       selector:
         number:
@@ -124,8 +83,6 @@ set_custom_screen:
           max: 4
           step: 1
     text:
-      name: Text
-      description: Text to show (up to 64 characters; longer text scrolls). Leave empty to remove the screen.
       required: false
       selector:
         text:

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Coroutine
 import logging
+from typing import Any
 
 import aiohttp
 import voluptuous as vol
@@ -10,8 +12,11 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import device_registry as dr
-import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    issue_registry as ir,
+)
 
 from . import legacy_migration
 from .const import CUSTOM_SCREEN_SLOTS, DOMAIN
@@ -25,6 +30,13 @@ SERVICE_RESTART_DEVICE = "restart_device"
 SERVICE_SET_SCREEN_ROTATION = "set_screen_rotation"
 SERVICE_SET_TIMEZONE = "set_timezone"
 SERVICE_SET_CUSTOM_SCREEN = "set_custom_screen"
+
+# Actions that duplicate an entity: the entity action and entity that replace them.
+DEPRECATED_ACTIONS = {
+    SERVICE_SET_BRIGHTNESS: ("number.set_value", "Display brightness"),
+    SERVICE_DISPLAY_TEXT: ("text.set_value", "Custom message"),
+    SERVICE_SET_TIMEZONE: ("select.select_option", "Timezone"),
+}
 
 BRIGHTNESS_SCHEMA = vol.Schema({
     vol.Required("device_id"): str,
@@ -147,9 +159,38 @@ def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_SET_TIMEZONE: (set_timezone_service, TIMEZONE_SCHEMA),
         SERVICE_SET_CUSTOM_SCREEN: (set_custom_screen_service, CUSTOM_SCREEN_SCHEMA),
     }
+    for name in DEPRECATED_ACTIONS:
+        services[name] = (_deprecated(hass, name, services[name][0]), services[name][1])
     for name, (handler, schema) in services.items():
         hass.services.async_register(DOMAIN, name, handler, schema=schema)
     legacy_migration.async_register_service_aliases(hass, services)  # legacy: HACS-only
+
+
+def _deprecated(
+    hass: HomeAssistant,
+    name: str,
+    handler: Callable[[ServiceCall], Coroutine[Any, Any, None]],
+) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
+    """Run a deprecated action, and raise a repair issue naming its replacement."""
+    replacement, entity = DEPRECATED_ACTIONS[name]
+
+    async def deprecated(call: ServiceCall) -> None:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            f"deprecated_action_{name}",
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="deprecated_action",
+            translation_placeholders={
+                "action": f"{DOMAIN}.{name}",
+                "replacement": replacement,
+                "entity": entity,
+            },
+        )
+        await handler(call)
+
+    return deprecated
 
 
 @callback
