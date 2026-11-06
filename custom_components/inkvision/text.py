@@ -60,10 +60,9 @@ class InkVisionCustomTextEntity(InkVisionEntity, TextEntity):
         Devices that haven't reported a firmware_id at all are old builds
         from before this field existed - also gated off.
         """
-        if not super().available or not self.coordinator.data:
+        if not super().available:
             return False
-        status = self.coordinator.data.get("status", {}) or {}
-        firmware_id = status.get("firmware_id")
+        firmware_id = self.coordinator.data.status.get("firmware_id")
         return isinstance(firmware_id, int) and firmware_id >= MIN_FIRMWARE_ID_CUSTOM_TEXT
 
     async def async_set_value(self, value: str) -> None:

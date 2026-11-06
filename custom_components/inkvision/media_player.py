@@ -90,10 +90,7 @@ class InkVisionSpeakerEntity(InkVisionEntity, MediaPlayerEntity):
         self._last_media_type: str = str(MediaType.MUSIC)
 
     def _status(self) -> dict[str, Any]:
-        if not self.coordinator.data:
-            return {}
-        status = self.coordinator.data.get("status", {})
-        return status if isinstance(status, dict) else {}
+        return self.coordinator.data.status
 
     def _speaker_data(self) -> dict[str, Any]:
         status = self._status()

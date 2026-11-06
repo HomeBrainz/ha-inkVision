@@ -24,23 +24,16 @@ class InkVisionEntity(CoordinatorEntity[InkVisionDataUpdateCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        device_name = "inkVision"
-        mac_address = ""
-
-        status = {}
-        if self.coordinator.data:
-            status = self.coordinator.data.get("status", {}) or {}
-            if isinstance(status, dict):
-                device_name = status.get("device", device_name)
-                mac_address = status.get("mac_address", mac_address)
+        status = self.coordinator.data.status
+        mac_address = status.get("mac_address", "")
 
         return DeviceInfo(
             identifiers={(DOMAIN, self.coordinator.device_key)},
             connections={(CONNECTION_NETWORK_MAC, format_mac(mac_address))} if mac_address else set(),
-            name=device_name,
+            name=status.get("device", "inkVision"),
             manufacturer=MANUFACTURER,
             model=MODEL,
-            sw_version=status.get("version", "Unknown") if isinstance(status, dict) else "Unknown",
+            sw_version=status.get("version", "Unknown"),
             configuration_url=f"http://{self.coordinator.host}",
         )
 

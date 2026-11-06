@@ -208,10 +208,7 @@ class InkVisionSensorEntity(InkVisionEntity, SensorEntity):
 
     def get_sensor_section(self, section: str) -> dict[str, Any] | None:
         """Return a sensor subsection from coordinator data."""
-        if not self.coordinator.data:
-            return None
-        sensors = self.coordinator.data.get("sensors", {})
-        section_data = sensors.get(section)
+        section_data = self.coordinator.data.sensors.get(section)
         return section_data if isinstance(section_data, dict) else None
 
     def get_sensor_value(self, section: str, key: str, default: Any | None = None) -> Any | None:
@@ -223,21 +220,11 @@ class InkVisionSensorEntity(InkVisionEntity, SensorEntity):
 
     def get_status_value(self, key: str, default: Any | None = None) -> Any | None:
         """Get a value from the status section."""
-        if not self.coordinator.data:
-            return default
-        status = self.coordinator.data.get("status", {})
-        if not isinstance(status, dict):
-            return default
-        return status.get(key, default)
+        return self.coordinator.data.status.get(key, default)
 
     def get_ota_value(self, key: str, default: Any | None = None) -> Any | None:
         """Get a value from the OTA section."""
-        if not self.coordinator.data:
-            return default
-        ota = self.coordinator.data.get("ota", {})
-        if not isinstance(ota, dict):
-            return default
-        return ota.get(key, default)
+        return self.coordinator.data.ota.get(key, default)
 
 
 class InkVisionGenericSensor(InkVisionSensorEntity):
@@ -257,14 +244,12 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
         entity_category: EntityCategory | None = None,
         enabled_default: bool = True,
         suggested_display_precision: int | None = None,
-        extra_attributes_fn: Callable[[InkVisionSensorEntity], dict[str, Any] | None] | None = None,
     ) -> None:
         super().__init__(coordinator, config_entry)
         self._attr_unique_id = f"{coordinator.device_key}_{unique_id_suffix}"
         self._attr_translation_key = translation_key
         self._attr_entity_registry_enabled_default = enabled_default
         self._value_fn = value_fn
-        self._extra_attributes_fn = extra_attributes_fn
 
         if device_class is not None:
             self._attr_device_class = device_class
@@ -280,23 +265,7 @@ class InkVisionGenericSensor(InkVisionSensorEntity):
     @property
     def native_value(self) -> Any | None:
         """Return the extracted value."""
-        try:
-            value = self._value_fn(self)
-        except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("inkVision sensor '%s' failed to compute value", self.entity_id)
-            return None
-        return value
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        if not self._extra_attributes_fn:
-            return None
-        try:
-            attrs = self._extra_attributes_fn(self)
-        except Exception:  # pragma: no cover - defensive guard on callback
-            _LOGGER.exception("inkVision sensor '%s' failed to compute attributes", self.entity_id)
-            return None
-        return attrs
+        return self._value_fn(self)
 
 
 class InkVisionTemperatureSensor(InkVisionSensorEntity):
@@ -405,7 +374,4 @@ class InkVisionWiFiSignalSensor(InkVisionSensorEntity):
     @property
     def native_value(self) -> int | None:
         """Return the state of the sensor."""
-        if self.coordinator.data and "status" in self.coordinator.data:
-            status = self.coordinator.data["status"]
-            return status.get("rssi")
-        return None
+        return self.coordinator.data.status.get("rssi")

@@ -1,7 +1,6 @@
 """Switch platform for inkVision integration."""
 from __future__ import annotations
 
-from copy import deepcopy
 import logging
 
 from pyinkvision import InkVisionConnectionError, InkVisionResponseError
@@ -93,12 +92,7 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
         await self._set_enabled(False)
 
     def _get_enabled_screens(self) -> list[str]:
-        if not self.coordinator.data:
-            return []
-        screens = self.coordinator.data.get("screens", [])
-        if not isinstance(screens, list):
-            return []
-        return [screen for screen in screens if isinstance(screen, str)]
+        return self.coordinator.data.screens
 
     async def _set_enabled(self, enabled: bool) -> None:
         current = set(self._get_enabled_screens())
@@ -122,8 +116,4 @@ class InkVisionScreenSwitch(InkVisionSwitchEntity):
         except InkVisionConnectionError as err:
             raise self.coordinator.error("communication_error", error=str(err)) from err
 
-
-        existing = self.coordinator.data or {"sensors": {}, "status": {}, "screens": []}
-        new_data = deepcopy(existing)
-        new_data["screens"] = new_screens
-        self.coordinator.async_set_updated_data(new_data)
+        self.coordinator.async_set_updated_fields(screens=new_screens)

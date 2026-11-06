@@ -70,10 +70,7 @@ class InkVisionFirmwareUpdateAvailableSensor(InkVisionBinarySensor):
     @property
     def is_on(self) -> bool | None:
         """Return True if an update is available."""
-        ota = (self.coordinator.data or {}).get("ota", {})
-        if not isinstance(ota, dict):
-            return None
-        value = ota.get("updateAvailable")
+        value = self.coordinator.data.ota.get("updateAvailable")
         if value is None:
             return None
         return bool(value)
@@ -81,9 +78,7 @@ class InkVisionFirmwareUpdateAvailableSensor(InkVisionBinarySensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return OTA metadata attributes."""
-        ota = (self.coordinator.data or {}).get("ota", {})
-        if not isinstance(ota, dict):
-            return None
+        ota = self.coordinator.data.ota
         return {
             "current_firmware_id": ota.get("currentFirmwareId"),
             "latest_firmware_id": ota.get("latestFirmwareId"),

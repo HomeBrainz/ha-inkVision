@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import asyncio
-from copy import deepcopy
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 import logging
 import re
+from typing import Any
 
 from pyinkvision import (
     InkVisionClient,
@@ -42,6 +43,27 @@ def normalize_mac(value: str) -> str | None:
     return mac if _MAC.fullmatch(mac) else None
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Return value if the device sent a JSON object, else an empty dict."""
+    return value if isinstance(value, dict) else {}
+
+
+@dataclass(frozen=True, slots=True)
+class InkVisionData:
+    """The device state the entities read.
+
+    One field per device API: GET /sensors, /status, /display/screens,
+    /api/ota/check and /config.json. WebSocket pushes replace or merge into
+    them. Replace a field to change it; never mutate the dicts in place.
+    """
+
+    sensors: dict[str, Any] = field(default_factory=dict)
+    status: dict[str, Any] = field(default_factory=dict)
+    screens: list[str] = field(default_factory=list)
+    ota: dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
+
+
 def device_key(entry: ConfigEntry) -> str:
     """Return the device identifier, which also prefixes the entry's entity unique IDs.
 
@@ -52,7 +74,7 @@ def device_key(entry: ConfigEntry) -> str:
     return entry.entry_id
 
 
-class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
+class InkVisionDataUpdateCoordinator(DataUpdateCoordinator[InkVisionData]):
     """Class to manage fetching data from the inkVision device via WebSocket."""
 
     config_entry: InkVisionConfigEntry
@@ -139,10 +161,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
 
                     # Listen for messages; ends with InkVisionConnectionError.
                     async for data in websocket:
-                        try:
-                            await self._handle_websocket_message(data)
-                        except Exception as err:
-                            _LOGGER.error("Error processing WebSocket message: %s", err)
+                        await self._handle_websocket_message(data)
 
             except InkVisionConnectionError as err:
                 was_connected = self._websocket_connected
@@ -187,147 +206,62 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
             self._websocket_connected = False
             self._websocket = None
 
-    async def _handle_websocket_message(self, data: dict):
-        """Handle incoming WebSocket message."""
+    async def _handle_websocket_message(self, data: dict[str, Any]) -> None:
+        """Apply one message the device pushed."""
         message_type = data.get("type")
         _LOGGER.debug("Received WebSocket message type: %s", message_type)
-        
-        if message_type == "sensor_update":
-            # Real-time sensor data update
-            raw_sensor_data = data.get("data", {}) or {}
-            if not isinstance(raw_sensor_data, dict):
-                raw_sensor_data = {}
 
-            sensors_available = data.get("sensors_available")
-            if sensors_available is not None:
-                raw_sensor_data.setdefault("sensors_available", sensors_available)
+        match message_type:
+            case "sensor_update":
+                sensors = _as_dict(data.get("data"))
+                if (available := data.get("sensors_available")) is not None:
+                    sensors.setdefault("sensors_available", available)
+                status = self.data.status
+                if (timestamp := data.get("timestamp")) is not None:
+                    status = {**status, "last_sensor_update": timestamp}
+                self.async_set_updated_fields(sensors=sensors, status=status)
 
-            existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-            current_status = deepcopy(existing.get("status", {}))
-            screens_snapshot = deepcopy(existing.get("screens", []))
-            ota_snapshot = deepcopy(existing.get("ota", {}))
-            config_snapshot = deepcopy(existing.get("config", {}))
+            case "status_update":
+                status = _as_dict(data.get("data"))
+                if (timestamp := data.get("timestamp")) is not None:
+                    status.setdefault("last_status_update", timestamp)
+                # Merge: pushes carry a subset of /status (e.g. no firmware_id on some builds).
+                self.async_set_updated_fields(status={**self.data.status, **status})
+                if not self.data.sensors:
+                    await self._send_websocket_command({"command": "get_sensors"})
 
-            timestamp = data.get("timestamp")
-            if timestamp is not None:
-                current_status["last_sensor_update"] = timestamp
+            case "button_event":
+                if isinstance(event := data.get("data"), dict):
+                    for listener in list(self._button_listeners):
+                        listener(event)
 
-            _LOGGER.debug("Updating sensor data via WebSocket: %s", raw_sensor_data)
-            self.async_set_updated_data({
-                "sensors": raw_sensor_data,
-                "status": current_status,
-                "screens": screens_snapshot,
-                "ota": ota_snapshot,
-                "config": config_snapshot,
-            })
-            
-        elif message_type == "status_update":
-            # Status update from device
-            status_payload = data.get("data", {}) or {}
-            if not isinstance(status_payload, dict):
-                status_payload = {}
+            case "ping":
+                await self._send_websocket_command({"type": "pong", "timestamp": data.get("timestamp")})
 
-            timestamp = data.get("timestamp")
-            if timestamp is not None:
-                status_payload.setdefault("last_status_update", timestamp)
+            case _ if data.get("command"):
+                self._async_handle_command_reply(data)
 
-            _LOGGER.debug("Received status update: %s", status_payload)
-
-            existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-            sensors_snapshot = deepcopy(existing.get("sensors", {}))
-            screens_snapshot = deepcopy(existing.get("screens", []))
-            ota_snapshot = deepcopy(existing.get("ota", {}))
-            config_snapshot = deepcopy(existing.get("config", {}))
-            # Merge: pushes carry a subset of /status (e.g. no firmware_id on some builds).
-            status_snapshot = deepcopy(existing.get("status", {}))
-            status_snapshot.update(status_payload)
-
-            self.async_set_updated_data({
-                "sensors": sensors_snapshot,
-                "status": status_snapshot,
-                "screens": screens_snapshot,
-                "ota": ota_snapshot,
-                "config": config_snapshot,
-            })
-
-            if not sensors_snapshot:
-                await self._send_websocket_command({"command": "get_sensors"})
-                
-        elif message_type == "button_event":
-            event_data = data.get("data", {}) or {}
-            if isinstance(event_data, dict):
-                for listener in list(self._button_listeners):
-                    listener(event_data)
-
-        elif message_type == "ping":
-            # Respond to ping with pong
-            await self._send_websocket_command({"type": "pong", "timestamp": data.get("timestamp")})
-            
-        elif data.get("command"):
-            # Response to a command we sent
-            command = data.get("command")
-            success = data.get("success", False)
-            
-            if success and command == "get_sensors":
-                sensor_data = data.get("data", {}) or {}
-                if not isinstance(sensor_data, dict):
-                    sensor_data = {}
-
-                existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-                current_status = deepcopy(existing.get("status", {}))
-                screens_snapshot = deepcopy(existing.get("screens", []))
-                ota_snapshot = deepcopy(existing.get("ota", {}))
-                config_snapshot = deepcopy(existing.get("config", {}))
-
-                self.async_set_updated_data({
-                    "sensors": sensor_data,
-                    "status": current_status,
-                    "screens": screens_snapshot,
-                    "ota": ota_snapshot,
-                    "config": config_snapshot,
-                })
-
-            elif success and command == "get_status":
-                status_data = data.get("data", {}) or {}
-                if not isinstance(status_data, dict):
-                    status_data = {}
-
-                existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-                sensors_snapshot = deepcopy(existing.get("sensors", {}))
-                screens_snapshot = deepcopy(existing.get("screens", []))
-                ota_snapshot = deepcopy(existing.get("ota", {}))
-                config_snapshot = deepcopy(existing.get("config", {}))
-                # Merge: the WebSocket get_status reply omits fields that /status has.
-                status_snapshot = deepcopy(existing.get("status", {}))
-                status_snapshot.update(status_data)
-
-                self.async_set_updated_data({
-                    "sensors": sensors_snapshot,
-                    "status": status_snapshot,
-                    "screens": screens_snapshot,
-                    "ota": ota_snapshot,
-                    "config": config_snapshot,
-                })
-            elif command == "set_custom_screen":
+    @callback
+    def _async_handle_command_reply(self, data: dict[str, Any]) -> None:
+        """Apply the data in the reply to a command we sent."""
+        if not data.get("success", False):
+            return
+        reply = _as_dict(data.get("data"))
+        match data["command"]:
+            case "get_sensors":
+                self.async_set_updated_fields(sensors=reply)
+            case "set_custom_screen":
                 # Echoes slot/text; nothing to merge into status.
                 pass
-            elif success:
-                response_data = data.get("data", {}) or {}
-                if isinstance(response_data, dict) and response_data:
-                    existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-                    sensors_snapshot = deepcopy(existing.get("sensors", {}))
-                    status_snapshot = deepcopy(existing.get("status", {}))
-                    screens_snapshot = deepcopy(existing.get("screens", []))
-                    ota_snapshot = deepcopy(existing.get("ota", {}))
-                    config_snapshot = deepcopy(existing.get("config", {}))
-                    status_snapshot.update(response_data)
-                    self.async_set_updated_data({
-                        "sensors": sensors_snapshot,
-                        "status": status_snapshot,
-                        "screens": screens_snapshot,
-                        "ota": ota_snapshot,
-                        "config": config_snapshot,
-                    })
+            case _ if reply:
+                # get_status and other replies carry status fields. Merge: the
+                # WebSocket get_status reply omits fields that /status has.
+                self.async_set_updated_fields(status={**self.data.status, **reply})
+
+    @callback
+    def async_set_updated_fields(self, **changes: Any) -> None:
+        """Push new data to the entities, keeping the fields not in changes."""
+        self.async_set_updated_data(replace(self.data, **changes))
 
     def error(self, translation_key: str, **placeholders: str) -> HomeAssistantError:
         """Return a translated error whose message names this device."""
@@ -378,8 +312,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
     @property
     def custom_screens_supported(self) -> bool:
         """True when the firmware reports custom rotation screen slots."""
-        status = (self.data or {}).get("status", {}) or {}
-        slots = status.get("custom_screens")
+        slots = self.data.status.get("custom_screens")
         return isinstance(slots, int) and slots > 0
 
     async def async_set_custom_screen(self, slot: int, text: str) -> None:
@@ -457,31 +390,14 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         except InkVisionError as err:
             _LOGGER.error("Failed to set timezone: %s", err)
             return False
-        # Optimistically update coordinator data
-        new_data = deepcopy(self.data or {})
-        new_data.setdefault("config", {})["timeZone"] = timezone
-        self.async_set_updated_data(new_data)
+        self.async_set_updated_fields(config={**self.data.config, "timeZone": timezone})
         return True
 
     async def async_update_ota_status(self) -> None:
         """Refresh OTA status and merge into coordinator data."""
         ota_data = await self.async_fetch_ota_status()
-        if not ota_data:
-            return
-
-        existing = self.data or {"sensors": {}, "status": {}, "screens": [], "ota": {}, "config": {}}
-        sensors_snapshot = deepcopy(existing.get("sensors", {}))
-        status_snapshot = deepcopy(existing.get("status", {}))
-        screens_snapshot = deepcopy(existing.get("screens", []))
-        config_snapshot = deepcopy(existing.get("config", {}))
-
-        self.async_set_updated_data({
-            "sensors": sensors_snapshot,
-            "status": status_snapshot,
-            "screens": screens_snapshot,
-            "ota": ota_data,
-            "config": config_snapshot,
-        })
+        if ota_data:
+            self.async_set_updated_fields(ota=ota_data)
 
     async def async_install_firmware(self) -> str:
         """Re-check for an update, start installing it, and return its version.
@@ -490,8 +406,8 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         """
         # The cached OTA data can be hours old; always act on a fresh check.
         await self.async_update_ota_status()
-        ota = (self.data or {}).get("ota", {})
-        if not isinstance(ota, dict) or not ota:
+        ota = self.data.ota
+        if not ota:
             raise self.error("update_check_failed")
         if ota.get("error"):
             raise self.error("update_check_error", error=str(ota["error"]))
@@ -518,7 +434,7 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
         )
         return str(ota.get("latestVersion"))
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> InkVisionData:
         """Update data via HTTP (fallback when WebSocket is not available)."""
         if self._websocket_connected:
             _LOGGER.debug("WebSocket active, augmenting data via HTTP polling")
@@ -546,31 +462,27 @@ class InkVisionDataUpdateCoordinator(DataUpdateCoordinator):
                 translation_placeholders={"error": str(err)},
             ) from err
 
-        existing = self.data or {"screens": [], "ota": {}}
+        # Keep the last known values of the optional APIs when they fail.
+        cached = self.data or InkVisionData()
         try:
             screens = await self.client.get_screens()
         except InkVisionError:
             _LOGGER.debug("Unable to fetch screen rotation; keeping cached values")
-            screens = existing.get("screens", [])
+            screens = cached.screens
 
         try:
             self.button_actions = await self.client.get_button_actions()
         except InkVisionError:
             _LOGGER.debug("Unable to fetch button actions; keeping cached values")
 
-        ota_data = await self.async_fetch_ota_status()
-        if not ota_data:
-            ota_data = existing.get("ota", {}) if isinstance(existing, dict) else {}
-
-        config_data = await self.async_fetch_config()
-        if not config_data:
-            config_data = existing.get("config", {}) if isinstance(existing, dict) else {}
+        ota_data = await self.async_fetch_ota_status() or cached.ota
+        config_data = await self.async_fetch_config() or cached.config
 
         self._last_poll = self.hass.loop.time()
-        return {
-            "sensors": sensor_data,
-            "status": status_data,
-            "screens": screens,
-            "ota": ota_data if isinstance(ota_data, dict) else {},
-            "config": config_data if isinstance(config_data, dict) else {},
-        }
+        return InkVisionData(
+            sensors=sensor_data,
+            status=status_data,
+            screens=screens,
+            ota=ota_data,
+            config=config_data,
+        )

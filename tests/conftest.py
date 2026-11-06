@@ -169,6 +169,9 @@ class FakeWebSocket:
                     item = json.loads(item)
                 except ValueError:
                     continue
+            if not isinstance(item, dict):
+                # The library only yields JSON objects.
+                continue
             return item
 
     async def push(self, message: Any) -> None:

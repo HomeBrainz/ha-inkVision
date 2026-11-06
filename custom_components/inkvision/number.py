@@ -1,7 +1,6 @@
 """Number platform for inkVision integration."""
 from __future__ import annotations
 
-from copy import deepcopy
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
@@ -49,12 +48,7 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
     @property
     def native_value(self) -> int | None:
         """Return the current brightness level."""
-        if not self.coordinator.data:
-            return None
-        status = self.coordinator.data.get("status")
-        if not isinstance(status, dict):
-            return None
-        value = status.get("brightness")
+        value = self.coordinator.data.status.get("brightness")
         if value is None:
             return None
         try:
@@ -70,8 +64,6 @@ class InkVisionBrightnessNumber(InkVisionEntity, NumberEntity):
         if not await self.coordinator.send_device_command("set_brightness", value=brightness):
             raise self.coordinator.error("not_connected")
 
-        existing = self.coordinator.data or {"sensors": {}, "status": {}}
-        new_data = deepcopy(existing)
-        status = new_data.setdefault("status", {})
-        status["brightness"] = brightness
-        self.coordinator.async_set_updated_data(new_data)
+        self.coordinator.async_set_updated_fields(
+            status={**self.coordinator.data.status, "brightness": brightness}
+        )

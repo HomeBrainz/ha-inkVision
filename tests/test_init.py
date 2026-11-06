@@ -19,7 +19,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from pyinkvision import InkVisionConnectionError
 
-from custom_components.inkvision.coordinator import InkVisionDataUpdateCoordinator
+from custom_components.inkvision.coordinator import InkVisionData, InkVisionDataUpdateCoordinator
 from custom_components.inkvision.const import DOMAIN
 
 from .conftest import (
@@ -201,13 +201,7 @@ async def test_setup_tolerates_optional_endpoint_failures(
     await mock_websocket.wait_listening()
 
     coordinator = _coordinator(hass, mock_config_entry)
-    assert coordinator.data == {
-        "sensors": {},
-        "status": {"mac_address": MAC},
-        "screens": [],
-        "ota": {},
-        "config": {},
-    }
+    assert coordinator.data == InkVisionData(status={"mac_address": MAC})
     assert coordinator.button_actions == {}
     # No custom screen support reported: nothing pushed on connect.
     assert [c["command"] for c in mock_websocket.current.sent] == ["get_status", "get_sensors"]
@@ -313,13 +307,13 @@ async def test_websocket_sensor_update(
 
     assert _state(hass, "sensor", init_integration, "temperature").state == "23.4"
     coordinator = _coordinator(hass, init_integration)
-    assert coordinator.data["sensors"]["sensors_available"] is True
-    assert coordinator.data["status"]["last_sensor_update"] == 1000
+    assert coordinator.data.sensors["sensors_available"] is True
+    assert coordinator.data.status["last_sensor_update"] == 1000
     # Unrelated sections survive the push.
-    assert coordinator.data["config"] == {"timeZone": "Europe/Berlin"}
+    assert coordinator.data.config == {"timeZone": "Europe/Berlin"}
 
     await mock_websocket.current.push({"type": "sensor_update", "data": "garbage"})
-    assert coordinator.data["sensors"] == {}
+    assert coordinator.data.sensors == {}
 
 
 async def test_websocket_status_update_merges(
@@ -332,9 +326,9 @@ async def test_websocket_status_update_merges(
     await websocket.push({"type": "status_update", "data": {"brightness": 3}, "timestamp": 7})
 
     coordinator = _coordinator(hass, init_integration)
-    assert coordinator.data["status"]["brightness"] == 3
-    assert coordinator.data["status"]["last_status_update"] == 7
-    assert coordinator.data["status"]["firmware_id"] == STATUS_PAYLOAD["firmware_id"]
+    assert coordinator.data.status["brightness"] == 3
+    assert coordinator.data.status["last_status_update"] == 7
+    assert coordinator.data.status["firmware_id"] == STATUS_PAYLOAD["firmware_id"]
 
     # With no sensor data cached, a status push triggers a sensor request.
     await websocket.push({"type": "sensor_update", "data": {}})
@@ -355,20 +349,20 @@ async def test_websocket_command_responses(
     await websocket.push(
         {"command": "get_sensors", "success": True, "data": {"bme680": {"pressure": 990}}}
     )
-    assert coordinator.data["sensors"] == {"bme680": {"pressure": 990}}
+    assert coordinator.data.sensors == {"bme680": {"pressure": 990}}
 
     await websocket.push({"command": "get_sensors", "success": True, "data": []})
-    assert coordinator.data["sensors"] == {}
+    assert coordinator.data.sensors == {}
 
     await websocket.push({"command": "get_status", "success": True, "data": {"rssi": -70}})
-    assert coordinator.data["status"]["rssi"] == -70
-    assert coordinator.data["status"]["version"] == "1.2.3"
+    assert coordinator.data.status["rssi"] == -70
+    assert coordinator.data.status["version"] == "1.2.3"
 
     await websocket.push({"command": "get_status", "success": True, "data": "x"})
-    assert coordinator.data["status"]["rssi"] == -70
+    assert coordinator.data.status["rssi"] == -70
 
     await websocket.push({"command": "set_brightness", "success": True, "data": {"brightness": 12}})
-    assert coordinator.data["status"]["brightness"] == 12
+    assert coordinator.data.status["brightness"] == 12
 
     before = coordinator.data
     await websocket.push({"command": "set_custom_screen", "success": True, "data": {"slot": 1}})
@@ -383,9 +377,9 @@ async def test_websocket_ping_and_bad_messages(
     mock_websocket: FakeWebSocketFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test ping replies and that malformed messages don't kill the connection.
+    """Test ping replies and that odd messages don't kill the connection.
 
-    Invalid JSON never reaches the coordinator; pyinkvision drops it.
+    Invalid JSON and non-objects never reach the coordinator; pyinkvision drops them.
     """
     websocket = mock_websocket.current
     websocket.send.reset_mock()
@@ -394,8 +388,8 @@ async def test_websocket_ping_and_bad_messages(
     assert websocket.sent == [{"type": "pong", "timestamp": 42}]
 
     await websocket.push(["a", "list"])
-    assert "Error processing WebSocket message" in caplog.text
-
+    await websocket.push({"type": "sensor_update", "data": ["not", "an", "object"]})
+    await websocket.push({"type": "button_event", "data": "not an object"})
     await websocket.push({"type": "unknown"})
     assert len(mock_websocket.sockets) == 1
 

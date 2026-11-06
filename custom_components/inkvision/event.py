@@ -37,8 +37,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the event platform."""
     coordinator = config_entry.runtime_data
-    status = (coordinator.data or {}).get("status", {}) or {}
-    if not _has_buttons(status):
+    if not _has_buttons(coordinator.data.status):
         return
 
     async_add_entities(
@@ -74,10 +73,7 @@ class InkVisionButtonEvent(InkVisionEntity, EventEntity):
     @property
     def available(self) -> bool:
         """Unavailable on firmware that doesn't push button events."""
-        if not super().available or not self.coordinator.data:
-            return False
-        status = self.coordinator.data.get("status", {}) or {}
-        return bool(status.get("button_events"))
+        return super().available and bool(self.coordinator.data.status.get("button_events"))
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to button pushes from the coordinator."""

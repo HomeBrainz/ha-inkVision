@@ -38,16 +38,14 @@ class InkVisionFirmwareUpdate(InkVisionEntity, UpdateEntity):
         self._attr_unique_id = f"{coordinator.device_key}_firmware"
 
     def _ota(self) -> dict[str, Any]:
-        ota = (self.coordinator.data or {}).get("ota", {})
-        return ota if isinstance(ota, dict) else {}
+        return self.coordinator.data.ota
 
     @property
     def installed_version(self) -> str | None:
         """Return the running firmware version."""
         if version := self._ota().get("currentVersion"):
             return str(version)
-        status = (self.coordinator.data or {}).get("status", {}) or {}
-        version = status.get("version") if isinstance(status, dict) else None
+        version = self.coordinator.data.status.get("version")
         return str(version) if version else None
 
     @property

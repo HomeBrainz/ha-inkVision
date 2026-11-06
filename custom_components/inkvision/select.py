@@ -118,12 +118,7 @@ class InkVisionTimezoneSelect(InkVisionEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current timezone."""
-        if not self.coordinator.data:
-            return None
-        config = self.coordinator.data.get("config", {})
-        if not isinstance(config, dict):
-            return None
-        tz = config.get("timeZone")
+        tz = self.coordinator.data.config.get("timeZone")
         if tz and tz in SUPPORTED_TIMEZONES:
             return tz
         return None
