@@ -117,7 +117,7 @@ class InkVisionSpeakerEntity(CoordinatorEntity, MediaPlayerEntity):
 
     def _speaker_data(self) -> dict[str, Any]:
         status = self._status()
-        speaker = status.get("speaker", {})
+        speaker = status.get("speaker")
         if isinstance(speaker, dict):
             return speaker
 

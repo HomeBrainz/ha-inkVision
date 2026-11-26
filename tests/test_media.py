@@ -259,3 +259,32 @@ async def test_play_media_without_internal_url(
 
     assert aioclient_mock.mock_calls[-1][2]["media_id"] == STREAM_URL
     assert "No internal Home Assistant URL" in caplog.text
+
+
+async def test_speaker_state_from_atmos_top_level_status(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_websocket: FakeWebSocketFactory,
+) -> None:
+    """Test the speaker reads Atmos's top-level speaker_* status keys.
+
+    Atmos firmware has no nested "speaker" object; a missing key must not hide its
+    speaker_playing / speaker_available values.
+    """
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "media_player", DOMAIN, f"{init_integration.entry_id}_speaker"
+    )
+
+    await mock_websocket.current.push(
+        {"type": "status_update", "data": {"speaker_playing": True, "speaker_volume": 40}}
+    )
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state.state == "playing"
+    assert state.attributes["volume_level"] == 0.4
+
+    await mock_websocket.current.push(
+        {"type": "status_update", "data": {"speaker_playing": False}}
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "idle"
